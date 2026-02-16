@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<fmiBuildDescription fmiVersion="3.0">
+  <BuildConfiguration description="Build configuration for desktop platforms" modelIdentifier="linear_axis">
+    <SourceFileSet language="C99">
+      <SourceFile name="linear_axis.c"/>
+      <SourceFile name="linear_axis_data.c"/>
+      <SourceFile name="RTWCG_FMU_util.c"/>
+      <SourceFile name="linear_axis_fmu.c"/>
+    </SourceFileSet>
+  </BuildConfiguration>
+</fmiBuildDescription>

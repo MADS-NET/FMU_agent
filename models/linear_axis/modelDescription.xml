@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<fmiModelDescription fmiVersion="3.0" generationDateAndTime="2026-02-16T13:56:22Z" generationTool="Simulink (R2025b)" instantiationToken="{475c1aa8-56d1-a896-a09f-4f99c68a66e9}" modelName="linear_axis" variableNamingConvention="structured" version="1.2">
+  <ModelExchange canBeInstantiatedOnlyOncePerProcess="true" canGetAndSetFMUState="true" canSerializeFMUState="true" modelIdentifier="linear_axis" needsExecutionTool="false"/>
+  <UnitDefinitions>
+    <Unit name="N*m"/>
+    <Unit name="m"/>
+    <Unit name="m/s"/>
+  </UnitDefinitions>
+  <DefaultExperiment startTime="0" stepSize="0.001" stopTime="300"/>
+  <ModelVariables>
+    <Float64 causality="input" description="In1" initial="exact" name="setpoint" start="0" unit="m" valueReference="0" variability="continuous"/>
+    <Float64 causality="output" description="Output" initial="calculated" name="speed" unit="m/s" valueReference="1" variability="continuous"/>
+    <Float64 causality="output" description="Output1" initial="calculated" name="position" unit="m" valueReference="2" variability="continuous"/>
+    <Float64 causality="output" description="Output2" initial="calculated" name="torque" unit="N*m" valueReference="3" variability="continuous"/>
+    <Float64 causality="independent" description="time" name="time" valueReference="4" variability="continuous"/>
+    <Float64 causality="local" description="ContState1" initial="calculated" name="ContState1" valueReference="5" variability="continuous"/>
+    <Float64 causality="local" description="ContState2" initial="calculated" name="ContState2" valueReference="6" variability="continuous"/>
+    <Float64 causality="local" description="ContState3" initial="calculated" name="ContState3" valueReference="7" variability="continuous"/>
+    <Float64 causality="local" description="ContState4" initial="calculated" name="ContState4" valueReference="8" variability="continuous"/>
+    <Float64 causality="local" derivative="5" description="Deriv1" initial="calculated" name="Deriv1" valueReference="9" variability="continuous"/>
+    <Float64 causality="local" derivative="6" description="Deriv2" initial="calculated" name="Deriv2" valueReference="10" variability="continuous"/>
+    <Float64 causality="local" derivative="7" description="Deriv3" initial="calculated" name="Deriv3" valueReference="11" variability="continuous"/>
+    <Float64 causality="local" derivative="8" description="Deriv4" initial="calculated" name="Deriv4" valueReference="12" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator1" initial="calculated" name="EventIndicator1" valueReference="13" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator2" initial="calculated" name="EventIndicator2" valueReference="14" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator3" initial="calculated" name="EventIndicator3" valueReference="15" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator4" initial="calculated" name="EventIndicator4" valueReference="16" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator5" initial="calculated" name="EventIndicator5" valueReference="17" variability="continuous"/>
+  </ModelVariables>
+  <ModelStructure>
+    <Output valueReference="1"/>
+    <Output valueReference="2"/>
+    <Output valueReference="3"/>
+    <ContinuousStateDerivative valueReference="9"/>
+    <ContinuousStateDerivative valueReference="10"/>
+    <ContinuousStateDerivative valueReference="11"/>
+    <ContinuousStateDerivative valueReference="12"/>
+    <InitialUnknown valueReference="1"/>
+    <InitialUnknown valueReference="2"/>
+    <InitialUnknown valueReference="3"/>
+    <InitialUnknown valueReference="5"/>
+    <InitialUnknown valueReference="6"/>
+    <InitialUnknown valueReference="7"/>
+    <InitialUnknown valueReference="8"/>
+    <InitialUnknown valueReference="9"/>
+    <InitialUnknown valueReference="10"/>
+    <InitialUnknown valueReference="11"/>
+    <InitialUnknown valueReference="12"/>
+    <EventIndicator valueReference="13"/>
+    <EventIndicator valueReference="14"/>
+    <EventIndicator valueReference="15"/>
+    <EventIndicator valueReference="16"/>
+    <EventIndicator valueReference="17"/>
+  </ModelStructure>
+  <Annotations>
+    <Annotation type="com.mathworks.Simulink">
+      <Simulink>
+        <ImportCompatibility FMUProduct="standalone FMU" canSourceFileCodeGeneration="true" requireMATLABOnPath="no" requireRelease="all"/>
+        <SimulinkModelInterface>
+          <Inport blockPath="linear_axis/In1" dataType="double" dimension="[1]" portName="In1" portNumber="1" sampleTime="[0 0]" uniquePortName="setpoint" unit="m"/>
+          <Outport blockPath="linear_axis/Output" dataType="double" dimension="[1]" portName="Output" portNumber="1" sampleTime="[0 0]" uniquePortName="speed" unit="m/s"/>
+          <Outport blockPath="linear_axis/Output1" dataType="double" dimension="[1]" portName="Output1" portNumber="2" sampleTime="[0 0]" uniquePortName="position" unit="m"/>
+          <Outport blockPath="linear_axis/Output2" dataType="double" dimension="[1]" portName="Output2" portNumber="3" sampleTime="[0 0]" uniquePortName="torque" unit="N*m"/>
+        </SimulinkModelInterface>
+      </Simulink>
+    </Annotation>
+  </Annotations>
+</fmiModelDescription>
