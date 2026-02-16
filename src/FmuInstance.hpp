@@ -4,6 +4,8 @@
 #include <iostream>
 #include <unordered_map>
 #include <stdexcept>
+#include <vector>
+#include <map>
 
 extern "C" {
 #include <fmi4c.h>
@@ -36,57 +38,72 @@ public:
     /// @throws std::runtime_error if step execution fails
     void step(double dt);
 
-    void doStep(double dt);
+    void do_step(double dt);
 
     /// Set a real-valued variable by name
     /// @param name Variable name
     /// @param value Value to set
     /// @throws std::runtime_error if variable not found or set fails
-    void setReal(const std::string& name, double value);
+    void set_real(const std::string& name, double value);
 
     /// Get a real-valued variable by name
     /// @param name Variable name
     /// @return Variable value
     /// @throws std::runtime_error if variable not found or get fails
-    double getReal(const std::string& name) const;
+    double get_real(const std::string& name) const;
 
     /// Get current simulation time
     /// @return Current time
-    double getTime() const { return _current_time; }
+    double get_time() const { return _current_time; }
+
+    size_t get_outputs(std::map<std::string, double> &outs) const;
+    size_t get_inputs(std::map<std::string, double> &ins) const;
+    size_t get_params(std::map<std::string, double> &params) const;
+    size_t get_indep(std::map<std::string, double> &indep) const;
 
     void list_variables(std::ostream &s = std::cout);
 
+    std::vector<std::string> get_param_names() const;
+    std::vector<std::string> get_input_names() const;
+    std::vector<std::string> get_output_names() const;
+    std::vector<std::string> get_indep_names() const;
+
     struct SolverParams {
-        double relTol = 1e-6;
-        double absTol = 1e-8;
-        double hmin = 1e-12;
+        double _rel_tol = 1e-6;
+        double _abs_tol = 1e-8;
+        double _hmin = 1e-12;
     };
 
-    SolverParams solver_params;
+    SolverParams _solver_params;
 
 private:
     fmuHandle* _fmu = nullptr;
     fmi3InstanceHandle* _instance = nullptr;
     std::string _fmu_path, _instance_name;
+    std::vector<std::string> _out_vars;
+    std::vector<std::string> _in_vars;
+    std::vector<std::string> _param_vars;
+    std::vector<std::string> _indep_vars;
+
     double _start_time, _current_time;
     std::unordered_map<std::string, fmi3ValueReference> _var_cache;
 
     // Static enum-to-string translation maps
-    static const std::unordered_map<int, std::string> initialKindMap;
-    static const std::unordered_map<int, std::string> causalityMap;
-    static const std::unordered_map<int, std::string> dataTypeMap;
+    static const std::unordered_map<int, std::string> _initial_kind_map;
+    static const std::unordered_map<fmi3Causality, std::string> _causality_map;
+    static const std::unordered_map<fmi3DataType, std::string> _data_type_map;
 
     /// Resolve variable name to value reference
-    fmi3ValueReference resolveVarRef(const std::string& name) const;
+    fmi3ValueReference resolve_var_ref(const std::string& name) const;
     
     /// Check FMI status and throw if error
-    void checkStatus(fmi3Status status, const std::string& context) const;
+    void check_status(fmi3Status status, const std::string& context) const;
     
     /// Helper methods to translate enums to strings
-    static std::string getInitialKindString(int kind);
-    static std::string getCausalityString(int causality);
-    static std::string getDataTypeString(int dataType);
+    static std::string get_initial_kind_string(fmi3Initial kind);
+    static std::string get_causality_string(fmi3Causality causality);
+    static std::string get_data_type_string(fmi3DataType dataType);
     
     /// Handle discrete state updates and events
-    void handleEvents();
+    void handle_events();
 };

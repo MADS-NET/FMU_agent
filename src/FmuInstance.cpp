@@ -8,55 +8,60 @@
 
 using namespace std;
 
+void FmuWrapper::do_step(double dt) {
+  step(dt);
+}
+
 // Static map initializations for enum-to-string translation
-const std::unordered_map<int, std::string> FmuWrapper::initialKindMap = {
-    {0, "exact"},
-    {1, "approx"},
-    {2, "calculated"}
+const std::unordered_map<int, std::string> FmuWrapper::_initial_kind_map = {
+    {fmi3Initial::fmi3InitialExact, "exact"},
+    {fmi3Initial::fmi3InitialApprox, "approx"},
+    {fmi3Initial::fmi3InitialCalculated, "calculated"},
+    {fmi3Initial::fmi3InitialUndefined, "undefined"}
 };
 
-const std::unordered_map<int, std::string> FmuWrapper::causalityMap = {
-    {0, "structuralParameter"},
-    {1, "output"},
-    {2, "input"},
-    {3, "independent"},
-    {4, "calculatedParameter"},
-    {5, "parameter"},
-    {6, "unknown"}
+const std::unordered_map<fmi3Causality, std::string> FmuWrapper::_causality_map = {
+    {fmi3Causality::fmi3CausalityStructuralParameter, "structuralParameter"},
+    {fmi3Causality::fmi3CausalityOutput, "output"},
+    {fmi3Causality::fmi3CausalityInput, "input"},
+    {fmi3Causality::fmi3CausalityIndependent, "independent"},
+    {fmi3Causality::fmi3CausalityCalculatedParameter, "calculatedParameter"},
+    {fmi3Causality::fmi3CausalityParameter, "parameter"},
+    {fmi3Causality::fmi3CausalityLocal, "local"}
 };
 
-const std::unordered_map<int, std::string> FmuWrapper::dataTypeMap = {
-    {0, "Float64"},
-    {1, "Float32"},
-    {2, "Int8"},
-    {3, "UInt8"},
-    {4, "Int16"},
-    {5, "UInt16"},
-    {6, "Int32"},
-    {7, "UInt32"},
-    {8, "Int64"},
-    {9, "UInt64"},
-    {10, "Boolean"},
-    {11, "String"},
-    {12, "Binary"},
-    {13, "Enumeration"},
-    {14, "Clock"}
+const std::unordered_map<fmi3DataType, std::string> FmuWrapper::_data_type_map = {
+    {fmi3DataType::fmi3DataTypeFloat64, "Float64"},
+    {fmi3DataType::fmi3DataTypeFloat32, "Float32"},
+    {fmi3DataType::fmi3DataTypeInt8, "Int8"},
+    {fmi3DataType::fmi3DataTypeUInt8, "UInt8"},
+    {fmi3DataType::fmi3DataTypeInt16, "Int16"},
+    {fmi3DataType::fmi3DataTypeUInt16, "UInt16"},
+    {fmi3DataType::fmi3DataTypeInt32, "Int32"},
+    {fmi3DataType::fmi3DataTypeUInt32, "UInt32"},
+    {fmi3DataType::fmi3DataTypeInt64, "Int64"},
+    {fmi3DataType::fmi3DataTypeUInt64, "UInt64"},
+    {fmi3DataType::fmi3DataTypeBoolean, "Boolean"},
+    {fmi3DataType::fmi3DataTypeString, "String"},
+    {fmi3DataType::fmi3DataTypeBinary, "Binary"},
+    {fmi3DataType::fmi3DataTypeEnumeration, "Enumeration"},
+    {fmi3DataType::fmi3DataTypeClock, "Clock"}
 };
 
 // Helper methods to translate enums to strings
-std::string FmuWrapper::getInitialKindString(int kind) {
-  auto it = initialKindMap.find(kind);
-  return (it != initialKindMap.end()) ? it->second : "unknown(" + std::to_string(kind) + ")";
+std::string FmuWrapper::get_initial_kind_string(fmi3Initial kind) {
+  auto it = _initial_kind_map.find(kind);
+  return (it != _initial_kind_map.end()) ? it->second : "unknown(" + std::to_string(kind) + ")";
 }
 
-std::string FmuWrapper::getCausalityString(int causality) {
-  auto it = causalityMap.find(causality);
-  return (it != causalityMap.end()) ? it->second : "unknown(" + std::to_string(causality) + ")";
+std::string FmuWrapper::get_causality_string(fmi3Causality causality) {
+  auto it = _causality_map.find(causality);
+  return (it != _causality_map.end()) ? it->second : "unknown(" + std::to_string(causality) + ")";
 }
 
-std::string FmuWrapper::getDataTypeString(int dataType) {
-  auto it = dataTypeMap.find(dataType);
-  return (it != dataTypeMap.end()) ? it->second : "unknown(" + std::to_string(dataType) + ")";
+std::string FmuWrapper::get_data_type_string(fmi3DataType dataType) {
+  auto it = _data_type_map.find(dataType);
+  return (it != _data_type_map.end()) ? it->second : "unknown(" + std::to_string(dataType) + ")";
 }
 
 FmuWrapper::FmuWrapper(const std::string &fmu_path,
@@ -93,11 +98,25 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
                                                    false, // stopTimeDefined
                                                    0.0    // stopTime
   );
-  checkStatus(status, "enterInitializationMode");
+  check_status(status, "enterInitializationMode");
 
   // Exit initialization mode to prepare for stepping
   status = fmi3_exitInitializationMode(_instance);
-  checkStatus(status, "exitInitializationMode");
+  check_status(status, "exitInitializationMode");
+
+  int vnum = fmi3_getNumberOfVariables(_fmu);
+  for (int i = 0; i < vnum; ++i) {
+    auto v = fmi3_getVariableByIndex(_fmu, i + 1);
+    if (fmi3_getVariableCausality(v) == fmi3Causality::fmi3CausalityOutput) {
+      _out_vars.push_back(fmi3_getVariableName(v));
+    } else if (fmi3_getVariableCausality(v) == fmi3Causality::fmi3CausalityInput) {
+      _in_vars.push_back(fmi3_getVariableName(v));
+    } else if (fmi3_getVariableCausality(v) == fmi3Causality::fmi3CausalityParameter) {
+      _param_vars.push_back(fmi3_getVariableName(v));
+    } else if (fmi3_getVariableCausality(v) == fmi3Causality::fmi3CausalityIndependent) {
+      _indep_vars.push_back(fmi3_getVariableName(v));
+    }
+  }
 }
 
 FmuWrapper::~FmuWrapper() {
@@ -157,19 +176,19 @@ void FmuWrapper::step(double dt) {
   // Get the number of continuous states
   size_t numStates = 0;
   fmi3Status status = fmi3_getNumberOfContinuousStates(_instance, &numStates);
-  checkStatus(status, "getNumberOfContinuousStates");
+  check_status(status, "getNumberOfContinuousStates");
   
   if (numStates == 0) {
     // No states to integrate, just advance time and handle events
     _current_time += dt;
-    handleEvents();
+    handle_events();
     return;
   }
 
   // Adaptive RK45 integration parameters
-  const double &relTol = solver_params.relTol;
-  const double &absTol = solver_params.absTol;
-  const double &hmin = solver_params.hmin;
+  const double &relTol = _solver_params._rel_tol;
+  const double &absTol = _solver_params._abs_tol;
+  const double &hmin = _solver_params._hmin;
   
   double t = _current_time;
   double tend = _current_time + dt;
@@ -183,7 +202,7 @@ void FmuWrapper::step(double dt) {
   
   // Get initial state
   status = fmi3_getContinuousStates(_instance, y.data(), numStates);
-  checkStatus(status, "getContinuousStates");
+  check_status(status, "getContinuousStates");
   
   // Adaptive stepping loop
   while (t < tend && h > hmin) {
@@ -195,34 +214,34 @@ void FmuWrapper::step(double dt) {
     // RK45 with Dormand-Prince coefficients
     // Stage 1: k1 = f(t, y)
     status = fmi3_getContinuousStateDerivatives(_instance, k1.data(), numStates);
-    checkStatus(status, "getContinuousStateDerivatives at stage 1");
+    check_status(status, "getContinuousStateDerivatives at stage 1");
     
     // Stage 2: k2 = f(t + (1/5)*h, y + (1/5)*h*k1)
     for (size_t i = 0; i < numStates; ++i) {
       ytemp[i] = y[i] + (h / 5.0) * k1[i];
     }
     status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    checkStatus(status, "setContinuousStates at stage 2");
+    check_status(status, "setContinuousStates at stage 2");
     status = fmi3_getContinuousStateDerivatives(_instance, k2.data(), numStates);
-    checkStatus(status, "getContinuousStateDerivatives at stage 2");
+    check_status(status, "getContinuousStateDerivatives at stage 2");
     
     // Stage 3: k3 = f(t + (3/10)*h, y + (3/40)*h*k1 + (9/40)*h*k2)
     for (size_t i = 0; i < numStates; ++i) {
       ytemp[i] = y[i] + (3.0/40.0) * h * k1[i] + (9.0/40.0) * h * k2[i];
     }
     status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    checkStatus(status, "setContinuousStates at stage 3");
+    check_status(status, "setContinuousStates at stage 3");
     status = fmi3_getContinuousStateDerivatives(_instance, k3.data(), numStates);
-    checkStatus(status, "getContinuousStateDerivatives at stage 3");
+    check_status(status, "getContinuousStateDerivatives at stage 3");
     
     // Stage 4: k4 = f(t + (4/5)*h, y + (44/45)*h*k1 - (56/15)*h*k2 + (32/9)*h*k3)
     for (size_t i = 0; i < numStates; ++i) {
       ytemp[i] = y[i] + (44.0/45.0) * h * k1[i] - (56.0/15.0) * h * k2[i] + (32.0/9.0) * h * k3[i];
     }
     status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    checkStatus(status, "setContinuousStates at stage 4");
+    check_status(status, "setContinuousStates at stage 4");
     status = fmi3_getContinuousStateDerivatives(_instance, k4.data(), numStates);
-    checkStatus(status, "getContinuousStateDerivatives at stage 4");
+    check_status(status, "getContinuousStateDerivatives at stage 4");
     
     // Stage 5: k5 = f(t + (8/9)*h, y + ...)
     for (size_t i = 0; i < numStates; ++i) {
@@ -230,9 +249,9 @@ void FmuWrapper::step(double dt) {
                + (64448.0/6561.0) * h * k3[i] - (212.0/729.0) * h * k4[i];
     }
     status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    checkStatus(status, "setContinuousStates at stage 5");
+    check_status(status, "setContinuousStates at stage 5");
     status = fmi3_getContinuousStateDerivatives(_instance, k5.data(), numStates);
-    checkStatus(status, "getContinuousStateDerivatives at stage 5");
+    check_status(status, "getContinuousStateDerivatives at stage 5");
     
     // Stage 6: k6 = f(t + h, y + ...)
     for (size_t i = 0; i < numStates; ++i) {
@@ -240,9 +259,9 @@ void FmuWrapper::step(double dt) {
                + (46732.0/5247.0) * h * k3[i] + (49.0/176.0) * h * k4[i] - (5103.0/18656.0) * h * k5[i];
     }
     status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    checkStatus(status, "setContinuousStates at stage 6");
+    check_status(status, "setContinuousStates at stage 6");
     status = fmi3_getContinuousStateDerivatives(_instance, k6.data(), numStates);
-    checkStatus(status, "getContinuousStateDerivatives at stage 6");
+    check_status(status, "getContinuousStateDerivatives at stage 6");
     
     // 5th order solution: y_new = y + h * (35/384*k1 + 500/1113*k3 + 125/192*k4 - 2187/6784*k5 + 11/84*k6)
     // 4th order solution for error: y_hat = y + h * (5179/57600*k1 + 7571/16695*k3 + 393/640*k4 - 92097/339200*k5 + 187/2100*k6)
@@ -274,7 +293,7 @@ void FmuWrapper::step(double dt) {
       
       // Set accepted state into FMU
       status = fmi3_setContinuousStates(_instance, y.data(), numStates);
-      checkStatus(status, "setContinuousStates (accepted step)");
+      check_status(status, "setContinuousStates (accepted step)");
       
       // Increase step size for next iteration (but not too aggressively)
       h *= 0.9 * std::pow(1.0 / maxError, 0.2);
@@ -294,10 +313,10 @@ void FmuWrapper::step(double dt) {
   _current_time = tend;
   
   // Handle events at the end of the step
-  handleEvents();
+  handle_events();
 }
 
-void FmuWrapper::handleEvents() {
+void FmuWrapper::handle_events() {
   // Check for events after stepping
   fmi3Boolean newDiscreteStatesNeeded = true;
   fmi3Boolean terminateSimulation = false;
@@ -315,7 +334,7 @@ void FmuWrapper::handleEvents() {
                                                   &valuesOfContinuousStatesChanged,
                                                   &nextEventTimeDefined,
                                                   &nextEventTime);
-    checkStatus(status, "updateDiscreteStates");
+    check_status(status, "updateDiscreteStates");
     
     if (terminateSimulation) {
       throw std::runtime_error("FMU requested termination during event handling");
@@ -323,27 +342,27 @@ void FmuWrapper::handleEvents() {
   }
 }
 
-void FmuWrapper::setReal(const std::string &name, double value) {
+void FmuWrapper::set_real(const std::string &name, double value) {
   if (!_instance) {
     throw std::runtime_error("FMU instance not initialized");
   }
 
-  fmi3ValueReference vr = resolveVarRef(name);
+  fmi3ValueReference vr = resolve_var_ref(name);
 
   fmi3Status status = fmi3_setFloat64(_instance, &vr, 1, &value, 1);
-  checkStatus(status, std::string("setFloat64 for variable ") + name);
+  check_status(status, std::string("setFloat64 for variable ") + name);
 }
 
-double FmuWrapper::getReal(const std::string &name) const {
+double FmuWrapper::get_real(const std::string &name) const {
   if (!_instance) {
     throw std::runtime_error("FMU instance not initialized");
   }
 
-  fmi3ValueReference vr = resolveVarRef(name);
+  fmi3ValueReference vr = resolve_var_ref(name);
   fmi3Float64 value = 0.0;
 
   fmi3Status status = fmi3_getFloat64(_instance, &vr, 1, &value, 1);
-  checkStatus(status, std::string("getFloat64 for variable ") + name);
+  check_status(status, std::string("getFloat64 for variable ") + name);
 
   return value;
 }
@@ -355,14 +374,66 @@ void FmuWrapper::list_variables(ostream &s) {
     auto v = fmi3_getVariableByIndex(fmu, i + 1);
     s << i << ": " << fmi3_getVariableName(v) 
       << " [" << fmi3_getVariableDescription(v) << "]"
-      << ", initial: " << getInitialKindString(fmi3_getVariableInitial(v))
-      << ", causality: " << getCausalityString(fmi3_getVariableCausality(v))
-      << ", type: " << getDataTypeString(fmi3_getVariableDataType(v))
+      << ", initial: " << get_initial_kind_string(fmi3_getVariableInitial(v))
+      << ", causality: " << get_causality_string(fmi3_getVariableCausality(v))
+      << ", type: " << get_data_type_string(fmi3_getVariableDataType(v))
       << endl;
   }
 }
 
-fmi3ValueReference FmuWrapper::resolveVarRef(const std::string &name) const {
+size_t FmuWrapper::get_outputs(std::map<std::string, double> &outs) const {
+  size_t n = 0;
+  for (auto const &name : _out_vars) {
+    outs[name] = get_real(name);
+    n++;
+  }
+  return n;
+}
+
+size_t FmuWrapper::get_inputs(std::map<std::string, double> &ins) const {
+  size_t n = 0;
+  for (auto const &name : _in_vars) {
+    ins[name] = get_real(name);
+    n++;
+  }
+  return n;
+}
+
+size_t FmuWrapper::get_params(std::map<std::string, double> &params) const {
+  size_t n = 0;
+  for (auto const &name : _param_vars) {
+    params[name] = get_real(name);
+    n++;
+  }
+  return n;
+}
+
+size_t FmuWrapper::get_indep(std::map<std::string, double> &indep) const {
+  size_t n = 0;
+  for (auto const &name : _indep_vars) {
+    indep[name] = get_real(name);
+    n++;
+  }
+  return n;
+}
+
+std::vector<std::string> FmuWrapper::get_input_names() const {
+  return _in_vars;
+}
+
+std::vector<std::string> FmuWrapper::get_param_names() const {
+  return _param_vars;
+}
+
+std::vector<std::string> FmuWrapper::get_output_names() const {
+  return _out_vars;
+}
+
+std::vector<std::string> FmuWrapper::get_indep_names() const {
+  return _indep_vars;
+}
+
+fmi3ValueReference FmuWrapper::resolve_var_ref(const std::string &name) const {
   // Check cache first
   auto it = _var_cache.find(name);
   if (it != _var_cache.end()) {
@@ -384,7 +455,7 @@ fmi3ValueReference FmuWrapper::resolveVarRef(const std::string &name) const {
   return vr;
 }
 
-void FmuWrapper::checkStatus(fmi3Status status,
+void FmuWrapper::check_status(fmi3Status status,
                              const std::string &context) const {
   if (status == fmi3OK || status == fmi3Warning) {
     return;
