@@ -6,13 +6,18 @@
 #include <stdexcept>
 #include <vector>
 #include <map>
+#include <nlohmann/json.hpp>
 
 extern "C" {
 #include <fmi4c.h>
 }
 
+using json = nlohmann::json;
+
 class FmuWrapper {
 public:
+    FmuWrapper() {}
+
     /// Constructor loads the FMU and sets up the instance
     /// @param fmu_path Path to the .fmu file
     /// @param instance_name Name for the FMU instance
@@ -36,8 +41,6 @@ public:
     /// Execute one simulation step
     /// @param dt Step size (delta time)
     /// @throws std::runtime_error if step execution fails
-    void step(double dt);
-
     void do_step(double dt);
 
     /// Set a real-valued variable by name
@@ -60,6 +63,9 @@ public:
     size_t get_inputs(std::map<std::string, double> &ins) const;
     size_t get_params(std::map<std::string, double> &params) const;
     size_t get_indep(std::map<std::string, double> &indep) const;
+    
+    json value(std::string const &n);
+    void get_status(json &status);
 
     void list_variables(std::ostream &s = std::cout);
 
@@ -79,7 +85,8 @@ public:
 private:
     fmuHandle* _fmu = nullptr;
     fmi3InstanceHandle* _instance = nullptr;
-    std::string _fmu_path, _instance_name;
+    std::string _fmu_path = "", _instance_name = "";
+    bool _initialized = false;
     std::vector<std::string> _out_vars;
     std::vector<std::string> _in_vars;
     std::vector<std::string> _param_vars;

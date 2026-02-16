@@ -1,6 +1,11 @@
-#include "FmuInstance.hpp"
+#include "../FmuInstance.hpp"
 #include <iostream>
 #include <random>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+
+#define JSON_OUT
 
 using namespace std;
 
@@ -38,10 +43,15 @@ int main(int argc, const char **argv) {
   map<string, double> outs;
   map<string, double> params;
   map<string, double> indep;
+  json status;
   while (t < 10) {
     dt = dis(gen);
-    plant.step(dt);
+    plant.do_step(dt);
     t += dt;
+    #ifdef JSON_OUT
+    plant.get_status(status);
+    cout << status.dump() << endl;
+    #else
     plant.get_indep(indep);
     plant.get_inputs(inputs);
     plant.get_params(params);
@@ -62,6 +72,7 @@ int main(int argc, const char **argv) {
       cout << v << " ";
     }
     std::cout << std::endl;
+    #endif
     // feed y back into MADS
   }
   return 0;

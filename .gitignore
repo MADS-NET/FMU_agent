@@ -1,4 +1,6 @@
 build
 *.slx
 *.txt
+!CMakeLists.txt
 DoubleMassSpringDamper
+.vscode
