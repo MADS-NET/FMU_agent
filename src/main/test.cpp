@@ -5,7 +5,7 @@
 
 using json = nlohmann::json;
 
-#define JSON_OUT
+// #define JSON_OUT
 
 using namespace std;
 
@@ -44,6 +44,7 @@ int main(int argc, const char **argv) {
   map<string, double> params;
   map<string, double> indep;
   json status;
+  plant.set_real("setpoint", 0.5);
   while (t < 10) {
     dt = dis(gen);
     plant.do_step(dt);
@@ -56,8 +57,8 @@ int main(int argc, const char **argv) {
     plant.get_inputs(inputs);
     plant.get_params(params);
     plant.get_outputs(outs);
-    if (t > 5)
-      plant.set_real("b", 50);
+    // if (t > 5)
+    //   plant.set_real("b", 50);
     cout << t << " ";
     // for (auto const &[n, v] : indep) {
     //   cout << v << " ";

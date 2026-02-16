@@ -96,7 +96,7 @@ int main(int argc, char * const *argv) {
   hmin = settings.value("hmin", hmin);
 
   // Connection
-  agent.enable_threaded_remote_control();
+  agent.enable_remote_control();
   agent.connect();
   agent.register_event(event_type::startup);
   agent.info();
@@ -120,14 +120,33 @@ int main(int argc, char * const *argv) {
   chrono::steady_clock::time_point now;
   double dt = 0, t = 0;
   json status;
+  
   agent.loop([&]() -> chrono::milliseconds {
+    // timing
     now = chrono::steady_clock::now();
     dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep).count() / 1e6;
     last_timestep = now;
+    t += dt;
+    // input
+    if (agent.receive(true) == message_type::json && agent.last_topic() != "control") {
+      auto msg = agent.last_message();
+      auto in = json::parse(get<1>(msg));
+      if (!in["fmu_input"].is_object()) {
+        cerr << fg::yellow << "Missing fmu_input" << fg::reset << endl;
+        goto integrate;
+      }
+      for (auto const &[k, v] : in["fmu_input"].items()) {
+        plant.set_real(k, v);
+      }
+    }
+
+integrate:
+    // Integrate
     plant.do_step(dt);
     plant.get_status(status);
+
+    // output
     agent.publish(status);
-    t += dt;
     cout << "\r\x1b[0KSent status after " << t << " s";
     cout.flush();
     return 0ms;
