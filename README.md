@@ -26,6 +26,14 @@ A few notes:
 
 Currently, only **model exchange** FMUs are supported. Co-simulation FMUs are not supported.
 
+### Example FMUs
+
+FMUs are actuallt zipped folders that contain some XML file providing model description and a **compiled dynamic library**, which is supposed to be run-time loaded by the software using it.
+
+FMU files are typically exported from simulation software in the **compiled** format, which is only compatible with the working platform. In other words, a FMU file generatd on Intel Windows won't run on a Silicon macOS (and *vice-versa*).
+
+The project `model` directory contains example FMUs in **source format**, so that they can be compiled on the working machine producing a usable `.fmu` file. When you enable the CMake switch `MADS_BUILD_FMU`, the compiled FMUs are created and saved in the `models/fmu` directory.
+
 
 ## Execution
 
@@ -36,6 +44,8 @@ mads fmu my_model.fmu --inspect
 ```
 
 This is giving you a table of model variables and a suitable stub section for the `mads.ini` file. Copy that into your settings file, update the fields as needed and launch the `mads broker` command, if it is not running already.
+
+> **Note:** the inspect command reports the file name and the **model name**. The latter can be different from the file name, and it is set by the software that generated the FMU. On the MADS network, the agent running the FMU will have the name `fmu_<model name>`, also reported by the inspect command. Inless overridden by the `--name` switch, this is the expected section name in the INI settings file `mads.ini`.
 
 Now you can run the agent:
 
