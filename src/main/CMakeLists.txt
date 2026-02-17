@@ -13,7 +13,7 @@ else()
 endif()
 
 # Test
-add_executable(test test.cpp)
+add_executable(fmu-test test.cpp)
 target_link_libraries(test PRIVATE fmiinterface)
 
 # Agent
