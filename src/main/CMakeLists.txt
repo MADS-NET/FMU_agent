@@ -20,7 +20,8 @@ target_link_libraries(test PRIVATE fmiinterface)
 add_executable(mads-fmu fmu_agent.cpp)
 target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts mads-lib)
 
-
-install(TARGETS mads-fmu
-  RUNTIME DESTINATION bin
-)
+if(MADS_INSTALL_AGENT)
+  install(TARGETS mads-fmu
+    RUNTIME DESTINATION bin
+  )
+endif()

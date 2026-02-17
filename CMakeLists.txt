@@ -38,6 +38,8 @@ message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 # No warning on FetchContent_Populate
 cmake_policy(SET CMP0169 OLD)
 
+option(MADS_INSTALL_AGENT "Install the FMU agent" OFF)
+
 #   ____                            _                 _           
 #  |  _ \  ___ _ __   ___ _ __   __| | ___ _ __   ___(_) ___  ___ 
 #  | | | |/ _ \ '_ \ / _ \ '_ \ / _` |/ _ \ '_ \ / __| |/ _ \/ __|
@@ -97,10 +99,13 @@ set(CMAKE_SKIP_INSTALL_RULES ${_old_skip})
 #  | |_) | |_| | | | (_| |
 #  |____/ \__,_|_|_|\__,_|
 #                       
+#
 
+# Agent is created in the src/main directory
 file(GLOB LIB_SOURCES "${SRC_DIR}/*.c" "${SRC_DIR}/*.cpp")
 add_subdirectory(${SRC_DIR}/main)
 
+# Static library for C+ wrapper used by the agent
 add_library(fmiinterface STATIC ${LIB_SOURCES})
 target_link_libraries(fmiinterface fmi4c)
 
@@ -111,6 +116,6 @@ target_link_libraries(fmiinterface fmi4c)
 #  |  _| | |  | | |_| \__ \
 #  |_|   |_|  |_|\___/|___/
 #
-
+# FMUs are created in the models directory
 add_subdirectory(models)
 
