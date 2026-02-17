@@ -40,6 +40,8 @@ public:
 
     std::string model_name();
 
+    void reset();
+
     /// Execute one simulation step
     /// @param dt Step size (delta time)
     /// @throws std::runtime_error if step execution fails

@@ -56,6 +56,12 @@ The model is routinely evaluated and forward integrated at variable timestep, an
 }
 ```
 
+To reset the model, send the following:
+
+```json
+{"fmu_reset": true}
+```
+
 It is suggested to use the [rerunner plugin](https://github.com/mads-net/rerunner_plugin) to visualize the model state in real time.
 
 > **NOTE:** the model is suppsed to run in real time, i.e. the solution time for each timestep shall be shorter than the timestep itself. Relax the tolerances in the INI section if your model cannot keep up with the real time.

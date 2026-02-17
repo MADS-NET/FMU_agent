@@ -163,7 +163,6 @@ int main(int argc, char *const *argv) {
   chrono::steady_clock::time_point now;
   double dt = 0, t = 0;
   json status;
-
   agent.loop(
       [&]() -> chrono::milliseconds {
         // timing
@@ -178,6 +177,11 @@ int main(int argc, char *const *argv) {
             agent.last_topic() != "control") {
           auto msg = agent.last_message();
           auto in = json::parse(get<1>(msg));
+          if (in.value("fmu_reset", false)) {
+            plant.reset();
+            t = 0;
+            goto integrate;
+          }
           if (!in["fmu_input"].is_object()) {
             cerr << fg::yellow << "Missing fmu_input" << fg::reset << endl;
             goto integrate;

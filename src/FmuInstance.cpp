@@ -198,6 +198,13 @@ std::string FmuWrapper::model_name() {
   return fmi3_modelName(_instance->fmu);
 }
 
+void FmuWrapper::reset() {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+  check_status(fmi3_reset(_instance), "Resetting the model");
+}
+
 void FmuWrapper::do_step(double dt) {
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");

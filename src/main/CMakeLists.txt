@@ -14,7 +14,7 @@ endif()
 
 # Test
 add_executable(fmu-test test.cpp)
-target_link_libraries(test PRIVATE fmiinterface)
+target_link_libraries(fmu-test PRIVATE fmiinterface)
 
 # Agent
 add_executable(mads-fmu fmu_agent.cpp)
