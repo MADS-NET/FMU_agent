@@ -143,7 +143,8 @@ int main(int argc, char *const *argv) {
   agent.connect();
   agent.register_event(event_type::startup);
   agent.info();
-  cout << "  period:           " << style::bold << period << style::reset
+  cout << "  period:           " << style::bold << period.count() << " ms" 
+       << style::reset
        << endl
        << "  FMU file path:    " << style::bold << fmu_path << style::reset
        << endl
