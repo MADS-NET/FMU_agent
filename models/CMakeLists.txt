@@ -59,20 +59,22 @@ macro(add_fmu_library LIB_NAME)
     target_link_libraries(${LIB_NAME} PUBLIC ${ARG_LIBRARIES})
   endif()
 
+  set(FMU_DESTINATION "${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}")
+  message(STATUS "FMU destination: ${FMU_DESTINATION}")
   install(TARGETS ${LIB_NAME}
-    LIBRARY DESTINATION ${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}/binaries/${ARCH_PAIR}
+    LIBRARY DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
   )
   install(
     FILES ${CMAKE_CURRENT_LIST_DIR}/${LIB_NAME}/modelDescription.xml
-    DESTINATION ${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}
+    DESTINATION ${FMU_DESTINATION}
   )
 
   install(CODE "
     execute_process(
-      COMMAND ${CMAKE_COMMAND} -E tar -cf ${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}.fmu --format=zip .
-      WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}
+      COMMAND ${CMAKE_COMMAND} -E tar -cf ${FMU_DESTINATION}.fmu --format=zip .
+      WORKING_DIRECTORY ${FMU_DESTINATION}
     )
-    message(STATUS \"Created FMU package: ${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}.fmu\")
+    message(STATUS \"Created FMU package: ${FMU_DESTINATION}.fmu\")
   ")
 endmacro()
 
