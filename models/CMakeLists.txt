@@ -21,9 +21,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(ARCH_PAIR "x86_64-win64")
+    set(ARCH_PAIR "x86_64-windows")
   else()
-    set(ARCH_PAIR "aarch64-win64")
+    set(ARCH_PAIR "aarch64-windows")
   endif()
 else()
   message(WARNING "Unknown platform: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
@@ -63,6 +63,7 @@ macro(add_fmu_library LIB_NAME)
   message(STATUS "FMU destination: ${FMU_DESTINATION}")
   install(TARGETS ${LIB_NAME}
     LIBRARY DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
+    RUNTIME DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
   )
   install(
     FILES ${CMAKE_CURRENT_LIST_DIR}/${LIB_NAME}/modelDescription.xml
@@ -70,10 +71,16 @@ macro(add_fmu_library LIB_NAME)
   )
 
   install(CODE "
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E tar -cf ${FMU_DESTINATION}.fmu --format=zip .
-      WORKING_DIRECTORY ${FMU_DESTINATION}
-    )
+    if(WIN32)
+      execute_process(
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command \"Compress-Archive -Path '${FMU_DESTINATION}/*' -DestinationPath '${FMU_DESTINATION}.fmu' -Force\"
+      )
+    else()
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar -cf ${FMU_DESTINATION}.fmu --format=zip .
+        WORKING_DIRECTORY ${FMU_DESTINATION}
+      )
+    endif()
     message(STATUS \"Created FMU package: ${FMU_DESTINATION}.fmu\")
   ")
 endmacro()
