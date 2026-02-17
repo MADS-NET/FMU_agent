@@ -103,7 +103,7 @@ int main(int argc, char *const *argv) {
   }
   
   // Load FMU
-  FmuWrapper plant(fmu_path, "plant");
+  FmuWrapper plant(fmu_path.string(), "plant");
   agent_name = string("fmu_") + plant.model_name();
   if (options_parsed.count("name") != 0) {
     agent_name = options_parsed["name"].as<string>();

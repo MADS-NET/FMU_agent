@@ -9,6 +9,9 @@
 #include <nlohmann/json.hpp>
 
 extern "C" {
+#ifdef _WIN32
+#define NOMINMAX
+#endif
 #include <fmi4c.h>
 }
 

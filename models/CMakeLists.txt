@@ -40,7 +40,9 @@ if(NOT EXISTS ${FMI_PATH})
   message(STATUS "done.")
 endif()
 include_directories(${FMI_PATH}/headers)
-add_compile_options(-Wno-switch -Wno-format)
+if(!WIN32)
+  add_compile_options(-Wno-switch -Wno-format)
+endif()
 
 # Macro to create and install FMU libraries
 macro(add_fmu_library LIB_NAME)
@@ -57,7 +59,6 @@ macro(add_fmu_library LIB_NAME)
     target_link_libraries(${LIB_NAME} PUBLIC ${ARG_LIBRARIES})
   endif()
 
-  set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/fmu)
   install(TARGETS ${LIB_NAME}
     LIBRARY DESTINATION ${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}/binaries/${ARCH_PAIR}
   )

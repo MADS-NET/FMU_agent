@@ -18,7 +18,12 @@ target_link_libraries(fmu-test PRIVATE fmiinterface)
 
 # Agent
 add_executable(mads-fmu fmu_agent.cpp)
-target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts mads-lib)
+if(WIN32)
+  link_directories(${MADS_PREFIX}/lib ${MADS_PREFIX}/bin)
+  target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts zmqpp-static libzmq-v143-mt-s-4_3_6 snappy Ws2_32 bcrypt Secur32 Crypt32 Dnsapi IPHLPAPI madslib)
+else()
+  target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts mads-lib)
+endif()
 
 if(MADS_INSTALL_AGENT)
   install(TARGETS mads-fmu
