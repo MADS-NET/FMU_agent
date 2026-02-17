@@ -38,6 +38,8 @@ public:
     FmuWrapper(FmuWrapper&& other) noexcept;
     FmuWrapper& operator=(FmuWrapper&& other) noexcept;
 
+    std::string model_name();
+
     /// Execute one simulation step
     /// @param dt Step size (delta time)
     /// @throws std::runtime_error if step execution fails

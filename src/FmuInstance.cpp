@@ -1,4 +1,5 @@
 #include "FmuInstance.hpp"
+#include <rang.hpp>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -7,6 +8,7 @@
 #include <vector>
 
 using namespace std;
+using namespace rang;
 
 // Static map initializations for enum-to-string translation
 const std::unordered_map<int, std::string> FmuWrapper::_initial_kind_map = {
@@ -187,6 +189,13 @@ FmuWrapper &FmuWrapper::operator=(FmuWrapper &&other) noexcept {
     other._instance = nullptr;
   }
   return *this;
+}
+
+std::string FmuWrapper::model_name() {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+  return fmi3_modelName(_instance->fmu);
 }
 
 void FmuWrapper::do_step(double dt) {
@@ -410,13 +419,25 @@ void FmuWrapper::list_variables(ostream &s) {
   }
   auto &fmu = _instance->fmu;
   int vnum = fmi3_getNumberOfVariables(fmu);
+  string name = fmi3_modelName(fmu);
+  const int fw = 15;
+  s << style::bold << "Variables:" << endl
+    << setw(fw) << "Name"
+    << setw(fw) << "Description"
+    << setw(fw) << "Data type"
+    << setw(fw) << "Causality"
+    << setw(fw) << "Initial"
+    << style::reset << endl;
   for (int i = 0; i < vnum; ++i) {
     auto v = fmi3_getVariableByIndex(fmu, i + 1);
-    s << i << ": " << fmi3_getVariableName(v) << " ["
-      << fmi3_getVariableDescription(v) << "]"
-      << ", initial: " << get_initial_kind_string(fmi3_getVariableInitial(v))
-      << ", causality: " << get_causality_string(fmi3_getVariableCausality(v))
-      << ", type: " << get_data_type_string(fmi3_getVariableDataType(v))
+    auto c = fmi3_getVariableCausality(v);
+    if (c > fmi3Causality::fmi3CausalityCalculatedParameter)
+      continue;
+    s << setw(fw) << fmi3_getVariableName(v)
+      << setw(fw) << fmi3_getVariableDescription(v)
+      << setw(fw) << get_data_type_string(fmi3_getVariableDataType(v))
+      << setw(fw) << get_causality_string(c)
+      << setw(fw) << get_initial_kind_string(fmi3_getVariableInitial(v))
       << endl;
   }
 }

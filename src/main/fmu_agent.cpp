@@ -6,12 +6,12 @@
 //                             |___/
 
 #include "../FmuInstance.hpp"
-#include <mads.hpp>
 #include <agent.hpp>
-#include <rang.hpp>
+#include <chrono>
 #include <cxxopts.hpp>
 #include <filesystem>
-#include <chrono>
+#include <mads.hpp>
+#include <rang.hpp>
 
 using namespace std;
 using namespace chrono_literals;
@@ -19,7 +19,33 @@ using namespace cxxopts;
 using json = nlohmann::json;
 using namespace Mads;
 
-int main(int argc, char * const *argv) {
+bool inspect_fmu(filesystem::path const &path) {
+  if (!filesystem::exists(path)) {
+    cout << fg::red << "No file at " << path << fg::reset << endl;
+    return false;
+  }
+  auto fmu = FmuWrapper(path.string(), "plant");
+  auto model_name = fmu.model_name();
+  cout << style::bold 
+       << "Inspecting model at:    " << fg::green << path.string() << fg::reset
+       << "\nModel name (from .fmu): " << fg::green << model_name << fg::reset
+       << "\nAgent name (default):   " << fg::green << "fmu_" << model_name
+       << fg::reset << style::reset << endl;
+  fmu.list_variables(cout);
+  cout << endl
+       << style::bold << "INI settings section (defaults):" << endl
+       << style::reset << fg::green
+       << "[fmu_" << model_name << "]"
+       << "\npub_topic = \"fmu_" <<  model_name << "\""
+       << "\nsub_topic = [\"" <<  model_name << "_control\"]"
+       << "\nrelative_tol = 1e-4"
+       << "\nabsolute_tol = 1e-5"
+       << "\nhmin_tol = 1e-10" 
+       << fg::reset << endl;
+  return true;
+}
+
+int main(int argc, char *const *argv) {
   // Mads-related
   string settings_uri = SETTINGS_URI;
   bool crypto = false;
@@ -42,16 +68,47 @@ int main(int argc, char * const *argv) {
   // if needed, add here further CLI options
   // clang-format off
   options.add_options()
+    ("f, fmu", "FMU file to load", value<filesystem::path>())
     ("p,period", "Sampling period (default 100 ms)", value<size_t>())
-    ("f,fmu", "FMU file to load", value<filesystem::path>())
-    ("n,name", "Agent name (default to 'fmu_agent')", value<string>())
-    ("i,agent-id", "Agent ID to be added to JSON frames", value<string>());
-  SETUP_OPTIONS(options, Agent);
+    ("n,name", "Agent name (default to fmu_<model name>)", value<string>())
+    ("i,agent-id", "Agent ID to be added to JSON frames", value<string>())
+    ("inspect", "Inspect the FMU and exit");
   // clang-format on
+  options.parse_positional({"fmu"});
+  options.positional_help("<module.fmu>");
+  SETUP_OPTIONS(options, Agent);
+
+  if (options_parsed.count("fmu") != 0) {
+    fmu_path = options_parsed["fmu"].as<filesystem::path>();
+    if (fmu_path.extension() != ".fmu") {
+      cerr << fg::red << "FMU file must have .fmu extension" << fg::reset
+           << endl;
+      exit(EXIT_FAILURE);
+    }
+    if (!filesystem::exists(fmu_path)) {
+      cerr << fg::red << "No FMU file at path " << fmu_path.string()
+           << fg::reset << endl;
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    cerr << fg::red << "Missing mandatory FMU path" << fg::reset << endl;
+    exit(EXIT_FAILURE);
+  }
+  if (options_parsed.count("inspect") != 0) {
+    if (inspect_fmu(fmu_path))
+      exit(EXIT_SUCCESS);
+    else
+      exit(EXIT_FAILURE);
+  }
+  
+  // Load FMU
+  FmuWrapper plant(fmu_path, "plant");
+  agent_name = string("fmu_") + plant.model_name();
   if (options_parsed.count("name") != 0) {
     agent_name = options_parsed["name"].as<string>();
-  } 
-  
+  }
+
+  // Create Agent
   Agent agent(agent_name, settings_uri);
   if (options_parsed.count("agent-id")) {
     agent.set_agent_id(options_parsed["agent-id"].as<string>());
@@ -72,20 +129,6 @@ int main(int argc, char * const *argv) {
 
   // Settings
   json settings = agent.get_settings();
-  fmu_path = settings.value("fmu_path", "");
-  if (options_parsed.count("fmu") != 0) {
-    fmu_path = options_parsed["fmu"].as<filesystem::path>();
-    if (fmu_path.extension() != ".fmu") {
-      cerr << fg::red << "FMU file must have .fmu extension" << fg::reset 
-           << endl;
-      exit(EXIT_FAILURE);
-    }
-  }
-  if (!filesystem::exists(fmu_path)) {
-    cerr << fg::red << "No FMU file at path " << fmu_path.string() 
-         << fg::reset << endl;
-    exit(EXIT_FAILURE);
-  }
   period = chrono::milliseconds(settings.value("period", 100));
   if (options_parsed.count("period") != 0) {
     period = chrono::milliseconds(options_parsed["period"].as<size_t>());
@@ -100,18 +143,16 @@ int main(int argc, char * const *argv) {
   agent.connect();
   agent.register_event(event_type::startup);
   agent.info();
-  cout << "  period:           " << style::bold << period << style::reset 
+  cout << "  period:           " << style::bold << period << style::reset
        << endl
-       << "  FMU file path:    " << style::bold << fmu_path << style::reset 
+       << "  FMU file path:    " << style::bold << fmu_path << style::reset
        << endl
-       << "  relative tol:     " << style::bold << relative_tol << style::reset 
+       << "  relative tol:     " << style::bold << relative_tol << style::reset
        << endl
-       << "  absolutre tol:    " << style::bold << absolute_tol << style::reset 
+       << "  absolutre tol:    " << style::bold << absolute_tol << style::reset
        << endl
-       << "  hmin:             " << style::bold << hmin << style::reset 
-       << endl;
+       << "  hmin:             " << style::bold << hmin << style::reset << endl;
 
-  FmuWrapper plant(fmu_path, "plant");
   plant._solver_params._rel_tol = 1e-5;
   plant._solver_params._abs_tol = 1e-7;
   plant._solver_params._hmin = 1e-12;
@@ -120,39 +161,43 @@ int main(int argc, char * const *argv) {
   chrono::steady_clock::time_point now;
   double dt = 0, t = 0;
   json status;
-  
-  agent.loop([&]() -> chrono::milliseconds {
-    // timing
-    now = chrono::steady_clock::now();
-    dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep).count() / 1e6;
-    last_timestep = now;
-    t += dt;
-    // input
-    if (agent.receive(true) == message_type::json && agent.last_topic() != "control") {
-      auto msg = agent.last_message();
-      auto in = json::parse(get<1>(msg));
-      if (!in["fmu_input"].is_object()) {
-        cerr << fg::yellow << "Missing fmu_input" << fg::reset << endl;
-        goto integrate;
-      }
-      for (auto const &[k, v] : in["fmu_input"].items()) {
-        plant.set_real(k, v);
-      }
-    }
 
-integrate:
-    // Integrate
-    plant.do_step(dt);
-    plant.get_status(status);
+  agent.loop(
+      [&]() -> chrono::milliseconds {
+        // timing
+        now = chrono::steady_clock::now();
+        dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
+                 .count() /
+             1e6;
+        last_timestep = now;
+        t += dt;
+        // input
+        if (agent.receive(true) == message_type::json &&
+            agent.last_topic() != "control") {
+          auto msg = agent.last_message();
+          auto in = json::parse(get<1>(msg));
+          if (!in["fmu_input"].is_object()) {
+            cerr << fg::yellow << "Missing fmu_input" << fg::reset << endl;
+            goto integrate;
+          }
+          for (auto const &[k, v] : in["fmu_input"].items()) {
+            plant.set_real(k, v);
+          }
+        }
 
-    // output
-    agent.publish(status);
-    cout << "\r\x1b[0KSent status after " << t << " s";
-    cout.flush();
-    return 0ms;
-  }, period);
-  cout << endl << fg::green << "FMU agent stopped" 
-       << fg::reset << endl;
+      integrate:
+        // Integrate
+        plant.do_step(dt);
+        plant.get_status(status);
+
+        // output
+        agent.publish(status);
+        cout << "\r\x1b[0KSent status after " << t << " s";
+        cout.flush();
+        return 0ms;
+      },
+      period);
+  cout << endl << fg::green << "FMU agent stopped" << fg::reset << endl;
   agent.register_event(event_type::shutdown);
   agent.disconnect();
   if (agent.restart()) {

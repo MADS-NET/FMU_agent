@@ -32,9 +32,9 @@ endif()
 message(STATUS "FMI3 Architecture pair: ${ARCH_PAIR}")
 
 # Download FMI3 headers
-set(FMI_PATH ${CMAKE_CURRENT_LIST_DIR}/FMI-Standard)
+set(FMI_PATH ${CMAKE_CURRENT_BINARY_DIR}/FMI-Standard)
 if(NOT EXISTS ${FMI_PATH})
-  message(STATUS "Downloading FMI-Standard package...")
+  message(STATUS "Downloading FMI-Standard package to ${FMI_PATH}...")
   file(DOWNLOAD https://github.com/modelica/fmi-standard/releases/download/v3.0.2/FMI-Standard-3.0.2.zip ${FMI_PATH}/FMI-Standard-3.0.2.zip)
   execute_process(COMMAND ${CMAKE_COMMAND} -E tar -xf ${FMI_PATH}/FMI-Standard-3.0.2.zip WORKING_DIRECTORY ${FMI_PATH})
   message(STATUS "done.")
@@ -82,6 +82,6 @@ endmacro()
 #  |  _| | |  | | |_| | | |_| | | | | | |_\__ \
 #  |_|   |_|  |_|\___/   \__,_|_| |_|_|\__|___/
 # 
-                                             
+
 # Create linear_axis FMU library
 add_fmu_library(linear_axis)
