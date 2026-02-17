@@ -36,6 +36,7 @@ bool inspect_fmu(filesystem::path const &path) {
        << style::bold << "INI settings section (defaults):" << endl
        << style::reset << fg::green
        << "[fmu_" << model_name << "]"
+       << "\nperiod = 100"
        << "\npub_topic = \"fmu_" <<  model_name << "\""
        << "\nsub_topic = [\"" <<  model_name << "_control\"]"
        << "\nrelative_tol = 1e-4"
@@ -54,7 +55,7 @@ int main(int argc, char *const *argv) {
   string server_key_name = "broker";
   Mads::auth_verbose auth_verbose = auth_verbose::off;
   string agent_name = argv[0], agent_id;
-  chrono::milliseconds period{0};
+  chrono::milliseconds period{100};
   // FMI-related
   filesystem::path fmu_path;
   FmuWrapper fmu;

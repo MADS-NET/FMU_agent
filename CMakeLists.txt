@@ -28,17 +28,20 @@ execute_process(
   OUTPUT_VARIABLE MADS_PREFIX
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-message(STATUS "MADS_PREFIX: ${MADS_PREFIX}")
 include_directories(${MADS_PREFIX}/include)
 link_directories(${MADS_PREFIX}/lib)
 set_property(CACHE CMAKE_INSTALL_PREFIX PROPERTY VALUE ${MADS_PREFIX})
-message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}") 
-
 # No warning on FetchContent_Populate
 cmake_policy(SET CMP0169 OLD)
 
 option(MADS_INSTALL_AGENT "Install the FMU agent" OFF)
+option(MADS_BUILD_FMU "Build and instal the sample FMUs" OFF)
+
+message(STATUS "MADS_PREFIX: ${MADS_PREFIX}")
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}") 
+message(STATUS "mads-fmu agent will be installed: ${MADS_INSTALL_AGENT}")
+message(STATUS "Example FMUs will be compiled an installed in models/fmu: ${MADS_BUILD_FMU}")
 
 #   ____                            _                 _           
 #  |  _ \  ___ _ __   ___ _ __   __| | ___ _ __   ___(_) ___  ___ 
@@ -117,5 +120,6 @@ target_link_libraries(fmiinterface fmi4c)
 #  |_|   |_|  |_|\___/|___/
 #
 # FMUs are created in the models directory
-add_subdirectory(models)
-
+if(MADS_BUILD_FMU)
+  add_subdirectory(models)
+endif()
