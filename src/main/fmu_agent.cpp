@@ -6,12 +6,15 @@
 //                             |___/
 
 #include "../FmuInstance.hpp"
+#include "../goback.hpp"
 #include <agent.hpp>
 #include <chrono>
 #include <cxxopts.hpp>
 #include <filesystem>
 #include <mads.hpp>
 #include <rang.hpp>
+#include <array>
+#include <format>
 
 using namespace std;
 using namespace chrono_literals;
@@ -161,8 +164,9 @@ int main(int argc, char *const *argv) {
 
   auto last_timestep = chrono::steady_clock::now();
   chrono::steady_clock::time_point now;
-  double dt = 0, t = 0;
+  double dt = 0, t = 0, t_in = 0, t_msg = 0;
   json status;
+  array<string, 3> console_out;
   agent.loop(
       [&]() -> chrono::milliseconds {
         // timing
@@ -179,13 +183,18 @@ int main(int argc, char *const *argv) {
           auto in = json::parse(get<1>(msg));
           if (in.value("fmu_reset", false)) {
             plant.reset();
+            t_msg = t;
             t = 0;
+            console_out[0] = to_string(t_msg) + " s, Reset received";
             goto integrate;
           }
           if (!in["fmu_input"].is_object()) {
-            cerr << fg::yellow << "Missing fmu_input" << fg::reset << endl;
+            t_msg = t;
+            console_out[0] = to_string(t_msg) + " s, Missing fmu_input";
             goto integrate;
           }
+          t_in = t;
+          console_out[1] = to_string(t_in) + " s, " + in["fmu_input"].dump();
           for (auto const &[k, v] : in["fmu_input"].items()) {
             plant.set_real(k, v);
           }
@@ -195,11 +204,13 @@ int main(int argc, char *const *argv) {
         // Integrate
         plant.do_step(dt);
         plant.get_status(status);
-
+        console_out[2] = to_string(t) + " s";
         // output
         agent.publish(status);
-        cout << "\r\x1b[0KSent status after " << t << " s";
-        cout.flush();
+        cout << goback(3) << fg::yellow
+             << "Last message: " << console_out[0] << fg::reset << endl
+             << "Received: " << console_out[1] << endl
+             << "Status update after: " << console_out[2] << endl;
         return 0ms;
       },
       period);
