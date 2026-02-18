@@ -1,0 +1,8 @@
+#ifndef DoubleMassSpringDamper_types_h_
+#define DoubleMassSpringDamper_types_h_
+
+typedef struct P_DoubleMassSpringDamper_T_ P_DoubleMassSpringDamper_T;
+typedef struct tag_RTM_DoubleMassSpringDamper_T
+  RT_MODEL_DoubleMassSpringDamper_T;
+
+#endif

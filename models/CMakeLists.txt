@@ -95,3 +95,4 @@ endmacro()
 
 # Create linear_axis FMU library
 add_fmu_library(linear_axis)
+add_fmu_library(DoubleMassSpringDamper)

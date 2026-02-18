@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<fmiModelDescription description="Double Mass-Spring-Damper in Simulink(R) and Simscape(TM)" fmiVersion="3.0" generationDateAndTime="2026-02-18T08:31:29Z" generationTool="Simulink (R2025b)" instantiationToken="{eb02d0f4-8a54-deab-20e0-8ee8e8743911}" modelName="DoubleMassSpringDamper" variableNamingConvention="structured" version="14.13">
+  <ModelExchange canBeInstantiatedOnlyOncePerProcess="true" canGetAndSetFMUState="false" canSerializeFMUState="false" modelIdentifier="DoubleMassSpringDamper" needsExecutionTool="false"/>
+  <UnitDefinitions>
+    <Unit name="m"/>
+  </UnitDefinitions>
+  <DefaultExperiment startTime="0" stepSize="0.2" stopTime="10"/>
+  <ModelVariables>
+    <Float64 causality="output" description="s1" initial="calculated" name="s1" unit="m" valueReference="0" variability="continuous"/>
+    <Float64 causality="output" description="s2" initial="calculated" name="s2" unit="m" valueReference="1" variability="continuous"/>
+    <Float64 causality="independent" description="time" name="time" valueReference="2" variability="continuous"/>
+    <Float64 causality="local" description="ContState1" initial="calculated" name="ContState1" valueReference="3" variability="continuous"/>
+    <Float64 causality="local" description="ContState2" initial="calculated" name="ContState2" valueReference="4" variability="continuous"/>
+    <Float64 causality="local" description="ContState3" initial="calculated" name="ContState3" valueReference="5" variability="continuous"/>
+    <Float64 causality="local" description="ContState4" initial="calculated" name="ContState4" valueReference="6" variability="continuous"/>
+    <Float64 causality="local" derivative="3" description="Deriv1" initial="calculated" name="Deriv1" valueReference="7" variability="continuous"/>
+    <Float64 causality="local" derivative="4" description="Deriv2" initial="calculated" name="Deriv2" valueReference="8" variability="continuous"/>
+    <Float64 causality="local" derivative="5" description="Deriv3" initial="calculated" name="Deriv3" valueReference="9" variability="continuous"/>
+    <Float64 causality="local" derivative="6" description="Deriv4" initial="calculated" name="Deriv4" valueReference="10" variability="continuous"/>
+    <Float64 causality="parameter" description="b" initial="exact" name="b" start="10" valueReference="11" variability="tunable"/>
+    <Float64 causality="parameter" description="k" initial="exact" name="k" start="400" valueReference="12" variability="tunable"/>
+    <Float64 causality="parameter" description="m" initial="exact" name="m" start="3.6" valueReference="13" variability="tunable"/>
+  </ModelVariables>
+  <ModelStructure>
+    <Output valueReference="0"/>
+    <Output valueReference="1"/>
+    <ContinuousStateDerivative valueReference="7"/>
+    <ContinuousStateDerivative valueReference="8"/>
+    <ContinuousStateDerivative valueReference="9"/>
+    <ContinuousStateDerivative valueReference="10"/>
+    <InitialUnknown valueReference="0"/>
+    <InitialUnknown valueReference="1"/>
+    <InitialUnknown valueReference="3"/>
+    <InitialUnknown valueReference="4"/>
+    <InitialUnknown valueReference="5"/>
+    <InitialUnknown valueReference="6"/>
+    <InitialUnknown valueReference="7"/>
+    <InitialUnknown valueReference="8"/>
+    <InitialUnknown valueReference="9"/>
+    <InitialUnknown valueReference="10"/>
+  </ModelStructure>
+  <Annotations>
+    <Annotation type="com.mathworks.Simulink">
+      <Simulink>
+        <ImportCompatibility FMUProduct="standalone FMU" canSourceFileCodeGeneration="true" requireMATLABOnPath="no" requireRelease="all"/>
+        <SimulinkModelInterface>
+          <Outport blockPath="DoubleMassSpringDamper/s1" dataType="double" dimension="[1]" portName="s1" portNumber="1" sampleTime="[0 0]" uniquePortName="s1" unit="m"/>
+          <Outport blockPath="DoubleMassSpringDamper/s2" dataType="double" dimension="[1]" portName="s2" portNumber="2" sampleTime="[0 0]" uniquePortName="s2" unit="m"/>
+        </SimulinkModelInterface>
+      </Simulink>
+    </Annotation>
+  </Annotations>
+</fmiModelDescription>
