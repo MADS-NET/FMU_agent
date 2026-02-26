@@ -11,6 +11,9 @@ if (APPLE)
 else()
   set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib;/usr/local/lib")
 endif()
+if(WIN32)
+  add_compile_options(/wd4005)
+endif()
 
 # Test
 add_executable(fmu-test test.cpp)
@@ -18,9 +21,11 @@ target_link_libraries(fmu-test PRIVATE fmiinterface)
 
 # Agent
 add_executable(mads-fmu fmu_agent.cpp)
+target_include_directories(mads-fmu BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/src/compat)
 if(WIN32)
+  target_compile_definitions(mads-fmu PRIVATE _HAS_STD_BYTE=0)
   link_directories(${MADS_PREFIX}/lib ${MADS_PREFIX}/bin)
-  target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts zmqpp-static libzmq-v143-mt-s-4_3_6 snappy Ws2_32 bcrypt Secur32 Crypt32 Dnsapi IPHLPAPI madslib)
+  target_link_libraries(mads-fmu PRIVATE fmiinterface Ws2_32 bcrypt Secur32 Crypt32 Dnsapi IPHLPAPI MadsCore)
 else()
   target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts MadsCore)
 endif()

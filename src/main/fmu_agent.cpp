@@ -29,7 +29,7 @@ bool inspect_fmu(filesystem::path const &path) {
   }
   auto fmu = FmuWrapper(path.string(), "plant");
   auto model_name = fmu.model_name();
-  auto deps = fmu.get_binary_dependencies();
+  
   cout << style::bold 
        << "Inspecting model at:    " << fg::green << path.string() << fg::reset
        << "\nModel name (from .fmu): " << fg::green << model_name << fg::reset
@@ -47,7 +47,9 @@ bool inspect_fmu(filesystem::path const &path) {
        << "\nabsolute_tol = 1e-5"
        << "\nhmin_tol = 1e-10" 
        << fg::reset << endl;
+
   cout << style::bold << "\nDependencies:" << style::reset << endl;
+  auto deps = fmu.get_binary_dependencies();
   for (auto &s : deps) {
     cout << "  " << s << endl;
   }

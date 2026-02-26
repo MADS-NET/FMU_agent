@@ -41,19 +41,6 @@ std::string shell_quote_posix(const std::string &s) {
   return out;
 }
 
-std::string powershell_quote(const std::string &s) {
-  std::string out = "'";
-  for (char c : s) {
-    if (c == '\'') {
-      out += "''";
-    } else {
-      out += c;
-    }
-  }
-  out += "'";
-  return out;
-}
-
 std::string read_text_file(const fs::path &path) {
   std::ifstream in(path);
   if (!in) {
@@ -898,9 +885,8 @@ std::vector<std::string> FmuWrapper::get_binary_dependencies() const {
       fs::create_directories(cleanup_dir);
 
       const std::string extract_cmd =
-          "powershell -NoProfile -Command \"Expand-Archive -LiteralPath " +
-          powershell_quote(fmu_path.string()) + " -DestinationPath " +
-          powershell_quote(cleanup_dir.string()) + " -Force\"";
+          "tar -xf \"" + fmu_path.string() + "\" -C \"" +
+          cleanup_dir.string() + "\"";
       run_command_capture(extract_cmd);
 
       const fs::path model_xml = cleanup_dir / "modelDescription.xml";
@@ -970,11 +956,12 @@ std::vector<std::string> FmuWrapper::get_binary_dependencies() const {
     inspect_output =
         run_command_capture("ldd " + shell_quote_posix(binary_path.string()));
 #endif
-  } catch (...) {
+  } catch (runtime_error &e) {
     if (!cleanup_dir.empty()) {
       std::error_code ec;
       fs::remove_all(cleanup_dir, ec);
     }
+    cout << "Error: " << e.what() << endl;
     throw;
   }
 
