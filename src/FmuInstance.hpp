@@ -80,6 +80,7 @@ public:
     std::vector<std::string> get_input_names() const;
     std::vector<std::string> get_output_names() const;
     std::vector<std::string> get_indep_names() const;
+    std::vector<std::string> get_binary_dependencies() const;
 
     struct SolverParams {
         double _rel_tol = 1e-6;

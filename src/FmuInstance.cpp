@@ -1,7 +1,13 @@
 #include "FmuInstance.hpp"
 #include <rang.hpp>
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -9,6 +15,253 @@
 
 using namespace std;
 using namespace rang;
+namespace fs = std::filesystem;
+
+namespace {
+
+std::string trim_copy(const std::string &s) {
+  const auto begin = s.find_first_not_of(" \t\r\n");
+  if (begin == std::string::npos) {
+    return "";
+  }
+  const auto end = s.find_last_not_of(" \t\r\n");
+  return s.substr(begin, end - begin + 1);
+}
+
+std::string shell_quote_posix(const std::string &s) {
+  std::string out = "'";
+  for (char c : s) {
+    if (c == '\'') {
+      out += "'\"'\"'";
+    } else {
+      out += c;
+    }
+  }
+  out += "'";
+  return out;
+}
+
+std::string powershell_quote(const std::string &s) {
+  std::string out = "'";
+  for (char c : s) {
+    if (c == '\'') {
+      out += "''";
+    } else {
+      out += c;
+    }
+  }
+  out += "'";
+  return out;
+}
+
+std::string read_text_file(const fs::path &path) {
+  std::ifstream in(path);
+  if (!in) {
+    throw std::runtime_error("Unable to open file: " + path.string());
+  }
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  return ss.str();
+}
+
+std::string run_command_capture(const std::string &command) {
+#ifdef _WIN32
+  FILE *pipe = _popen(command.c_str(), "r");
+#else
+  FILE *pipe = popen(command.c_str(), "r");
+#endif
+  if (!pipe) {
+    throw std::runtime_error("Failed to execute command: " + command);
+  }
+
+  std::array<char, 4096> buffer{};
+  std::string output;
+  while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
+    output += buffer.data();
+  }
+
+#ifdef _WIN32
+  const int rc = _pclose(pipe);
+#else
+  const int rc = pclose(pipe);
+#endif
+  if (rc != 0) {
+    throw std::runtime_error("Command failed (" + std::to_string(rc) + "): " +
+                             command + "\n" + output);
+  }
+  return output;
+}
+
+std::string get_platform_dir() {
+#if defined(_WIN32)
+#if defined(_M_X64) || defined(__x86_64__)
+  return "x86_64-windows";
+#elif defined(_M_IX86) || defined(__i386__)
+  return "x86-windows";
+#elif defined(_M_ARM64) || defined(__aarch64__)
+  return "aarch64-windows";
+#else
+  return "x86_64-windows";
+#endif
+#elif defined(__APPLE__)
+#if defined(__aarch64__) || defined(__arm64__)
+  return "aarch64-darwin";
+#elif defined(__x86_64__)
+  return "x86_64-darwin";
+#else
+  throw std::runtime_error("Unsupported macOS architecture for FMU binaries");
+#endif
+#elif defined(__linux__)
+#if defined(__aarch64__)
+  return "aarch64-linux";
+#elif defined(__x86_64__)
+  return "x86_64-linux";
+#else
+  throw std::runtime_error("Unsupported Linux architecture for FMU binaries");
+#endif
+#else
+  throw std::runtime_error("Unsupported platform");
+#endif
+}
+
+std::string get_binary_extension() {
+#if defined(_WIN32)
+  return ".dll";
+#elif defined(__APPLE__)
+  return ".dylib";
+#else
+  return ".so";
+#endif
+}
+
+std::string find_model_identifier(const std::string &xml) {
+  constexpr const char *tags[] = {"ModelExchange", "CoSimulation"};
+  for (const auto *tag : tags) {
+    const std::string marker = std::string("<") + tag;
+    std::size_t pos = 0;
+    while ((pos = xml.find(marker, pos)) != std::string::npos) {
+      const std::size_t close = xml.find('>', pos);
+      if (close == std::string::npos) {
+        break;
+      }
+      const std::string header = xml.substr(pos, close - pos + 1);
+      const std::size_t key = header.find("modelIdentifier=");
+      if (key != std::string::npos) {
+        const std::size_t quote_pos = key + std::string("modelIdentifier=").size();
+        if (quote_pos < header.size() &&
+            (header[quote_pos] == '"' || header[quote_pos] == '\'')) {
+          const char q = header[quote_pos];
+          const std::size_t value_begin = quote_pos + 1;
+          const std::size_t value_end = header.find(q, value_begin);
+          if (value_end != std::string::npos && value_end > value_begin) {
+            return header.substr(value_begin, value_end - value_begin);
+          }
+        }
+      }
+      pos = close + 1;
+    }
+  }
+  return "";
+}
+
+std::vector<std::string> list_binaries_in_directory(const fs::path &dir,
+                                                    const std::string &ext) {
+  std::vector<std::string> matches;
+  if (!fs::exists(dir) || !fs::is_directory(dir)) {
+    return matches;
+  }
+  for (const auto &entry : fs::directory_iterator(dir)) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+    if (entry.path().extension() == ext) {
+      matches.push_back(entry.path().string());
+    }
+  }
+  return matches;
+}
+
+std::vector<std::string> parse_zip_listing_for_binaries(
+    const std::string &listing, const std::string &platform_dir,
+    const std::string &ext) {
+  std::vector<std::string> entries;
+  const std::string prefix = "binaries/" + platform_dir + "/";
+  std::istringstream iss(listing);
+  std::string line;
+  while (std::getline(iss, line)) {
+    line = trim_copy(line);
+    if (line.rfind(prefix, 0) == 0 && line.size() >= ext.size() &&
+        line.substr(line.size() - ext.size()) == ext) {
+      entries.push_back(line);
+    }
+  }
+  return entries;
+}
+
+std::vector<std::string> parse_dependency_output(const std::string &output) {
+  std::vector<std::string> deps;
+  std::istringstream iss(output);
+  std::string line;
+
+#if defined(_WIN32)
+  while (std::getline(iss, line)) {
+    line = trim_copy(line);
+    if (line.empty()) {
+      continue;
+    }
+    std::string lower = line;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const auto pos = lower.rfind(".dll");
+    if (pos == std::string::npos || pos + 4 != lower.size()) {
+      continue;
+    }
+    const auto sep = line.find_first_of(" \t");
+    const std::string dep = (sep == std::string::npos) ? line : line.substr(0, sep);
+    if (!dep.empty()) {
+      deps.push_back(dep);
+    }
+  }
+#elif defined(__APPLE__)
+  bool first_line = true;
+  while (std::getline(iss, line)) {
+    line = trim_copy(line);
+    if (line.empty()) {
+      continue;
+    }
+    if (first_line) {
+      first_line = false;
+      continue;
+    }
+    const auto pos = line.find_first_of(" \t");
+    const std::string dep = (pos == std::string::npos) ? line : line.substr(0, pos);
+    if (!dep.empty()) {
+      deps.push_back(dep);
+    }
+  }
+#else
+  while (std::getline(iss, line)) {
+    line = trim_copy(line);
+    if (line.empty() || line.find("statically linked") != std::string::npos) {
+      continue;
+    }
+    std::string dep;
+    const auto arrow = line.find("=>");
+    if (arrow != std::string::npos) {
+      dep = trim_copy(line.substr(0, arrow));
+    } else {
+      const auto pos = line.find_first_of(" \t");
+      dep = (pos == std::string::npos) ? line : line.substr(0, pos);
+    }
+    if (!dep.empty()) {
+      deps.push_back(dep);
+    }
+  }
+#endif
+  return deps;
+}
+
+} // namespace
 
 // Static map initializations for enum-to-string translation
 const std::unordered_map<int, std::string> FmuWrapper::_initial_kind_map = {
@@ -599,6 +852,138 @@ std::vector<std::string> FmuWrapper::get_output_names() const {
 
 std::vector<std::string> FmuWrapper::get_indep_names() const {
   return _indep_vars;
+}
+
+std::vector<std::string> FmuWrapper::get_binary_dependencies() const {
+  if (_fmu_path.empty()) {
+    throw std::runtime_error("FMU path is empty");
+  }
+
+  const fs::path fmu_path(_fmu_path);
+  const std::string platform_dir = get_platform_dir();
+  const std::string ext = get_binary_extension();
+
+  fs::path binary_path;
+  fs::path cleanup_dir;
+  std::string inspect_output;
+  try {
+    if (fs::is_directory(fmu_path)) {
+      const fs::path model_xml = fmu_path / "modelDescription.xml";
+      const std::string model_id =
+          find_model_identifier(read_text_file(model_xml));
+      const fs::path bin_dir = fmu_path / "binaries" / platform_dir;
+      auto binaries = list_binaries_in_directory(bin_dir, ext);
+
+      if (binaries.empty()) {
+        throw std::runtime_error("No platform binary found in " +
+                                 bin_dir.string());
+      }
+
+      if (!model_id.empty()) {
+        const fs::path expected = bin_dir / (model_id + ext);
+        if (fs::exists(expected)) {
+          binary_path = expected;
+        }
+      }
+      if (binary_path.empty()) {
+        binary_path = binaries.front();
+      }
+    } else {
+#if defined(_WIN32)
+      const auto now = std::chrono::high_resolution_clock::now()
+                           .time_since_epoch()
+                           .count();
+      cleanup_dir =
+          fs::temp_directory_path() / ("fmu_dep_" + std::to_string(now));
+      fs::create_directories(cleanup_dir);
+
+      const std::string extract_cmd =
+          "powershell -NoProfile -Command \"Expand-Archive -LiteralPath " +
+          powershell_quote(fmu_path.string()) + " -DestinationPath " +
+          powershell_quote(cleanup_dir.string()) + " -Force\"";
+      run_command_capture(extract_cmd);
+
+      const fs::path model_xml = cleanup_dir / "modelDescription.xml";
+      const std::string model_id =
+          find_model_identifier(read_text_file(model_xml));
+      const fs::path bin_dir = cleanup_dir / "binaries" / platform_dir;
+      auto binaries = list_binaries_in_directory(bin_dir, ext);
+      if (binaries.empty()) {
+        throw std::runtime_error("No platform binary found inside FMU for " +
+                                 platform_dir);
+      }
+
+      if (!model_id.empty()) {
+        const fs::path expected = bin_dir / (model_id + ext);
+        if (fs::exists(expected)) {
+          binary_path = expected;
+        }
+      }
+      if (binary_path.empty()) {
+        binary_path = binaries.front();
+      }
+#else
+      const std::string quoted_fmu = shell_quote_posix(fmu_path.string());
+      const std::string model_xml =
+          run_command_capture("unzip -p " + quoted_fmu + " modelDescription.xml");
+      const std::string model_id = find_model_identifier(model_xml);
+
+      auto binaries = parse_zip_listing_for_binaries(
+          run_command_capture("unzip -Z1 " + quoted_fmu), platform_dir, ext);
+      if (binaries.empty()) {
+        throw std::runtime_error("No platform binary found inside FMU for " +
+                                 platform_dir);
+      }
+
+      std::string selected_entry = binaries.front();
+      if (!model_id.empty()) {
+        const std::string expected =
+            "binaries/" + platform_dir + "/" + model_id + ext;
+        auto it = std::find(binaries.begin(), binaries.end(), expected);
+        if (it != binaries.end()) {
+          selected_entry = *it;
+        }
+      }
+
+      const auto now = std::chrono::high_resolution_clock::now()
+                           .time_since_epoch()
+                           .count();
+      cleanup_dir =
+          fs::temp_directory_path() / ("fmu_dep_" + std::to_string(now));
+      fs::create_directories(cleanup_dir);
+
+      const std::string quoted_entry = shell_quote_posix(selected_entry);
+      const std::string quoted_tmp = shell_quote_posix(cleanup_dir.string());
+      run_command_capture("unzip -qq -o " + quoted_fmu + " " + quoted_entry +
+                          " -d " + quoted_tmp);
+      binary_path = cleanup_dir / selected_entry;
+#endif
+    }
+
+#if defined(_WIN32)
+    inspect_output =
+        run_command_capture("dumpbin /DEPENDENTS \"" + binary_path.string() + "\"");
+#elif defined(__APPLE__)
+    inspect_output =
+        run_command_capture("otool -L " + shell_quote_posix(binary_path.string()));
+#else
+    inspect_output =
+        run_command_capture("ldd " + shell_quote_posix(binary_path.string()));
+#endif
+  } catch (...) {
+    if (!cleanup_dir.empty()) {
+      std::error_code ec;
+      fs::remove_all(cleanup_dir, ec);
+    }
+    throw;
+  }
+
+  if (!cleanup_dir.empty()) {
+    std::error_code ec;
+    fs::remove_all(cleanup_dir, ec);
+  }
+
+  return parse_dependency_output(inspect_output);
 }
 
 fmi3ValueReference FmuWrapper::resolve_var_ref(const std::string &name) const {
