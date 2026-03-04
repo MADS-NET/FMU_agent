@@ -30,6 +30,13 @@ else()
   target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts MadsCore)
 endif()
 
+
+#   ___           _        _ _ 
+#  |_ _|_ __  ___| |_ __ _| | |
+#   | || '_ \/ __| __/ _` | | |
+#   | || | | \__ \ || (_| | | |
+#  |___|_| |_|___/\__\__,_|_|_|
+
 if(MADS_INSTALL_AGENT)
   install(TARGETS mads-fmu
     RUNTIME DESTINATION bin

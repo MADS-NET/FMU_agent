@@ -4,7 +4,8 @@
 #  |  _| | |  | || |   / ___ \ (_| |  __/ | | | |_ 
 #  |_|   |_|  |_|___| /_/   \_\__, |\___|_| |_|\__|
 #                             |___/                
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.28)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(FMU_agent VERSION 1.0.0 LANGUAGES C CXX)
 # set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
 
@@ -16,6 +17,7 @@ set(SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
 
 if(UNIX AND NOT APPLE)
   set(LINUX TRUE)
+  add_compile_options(-fPIC)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "")
@@ -56,6 +58,7 @@ FetchContent_Declare(cxxopts
   GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
   GIT_TAG        v3.1.1
   GIT_SHALLOW    TRUE
+  EXCLUDE_FROM_ALL
 )
 
 set(FMI4C_BUILD_TESTS ON CACHE BOOL "" FORCE)
@@ -67,6 +70,7 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/pbosetti/fmi4c.git
     GIT_TAG        HEAD   # or a commit hash for reproducibility
     GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL
 )
 
 set(BUILD_TESTING OFF CACHE INTERNAL "")
@@ -75,6 +79,7 @@ FetchContent_Declare(json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
   GIT_TAG        v3.12.0
   GIT_SHALLOW    TRUE
+  EXCLUDE_FROM_ALL
 )
 
 
@@ -82,6 +87,7 @@ FetchContent_Declare(rang
   GIT_REPOSITORY https://github.com/pbosetti/rang.git
   GIT_TAG        HEAD
   GIT_SHALLOW    TRUE
+  EXCLUDE_FROM_ALL
 )
 
 # Disabilita le install() della dependency
