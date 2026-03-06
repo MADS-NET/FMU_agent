@@ -185,7 +185,7 @@ int main(int argc, char *const *argv) {
       if (!value.is_number()) {
         cout << fg::red << "  NOT A NUMBER, SKIPPING" << fg::reset;
       } else {
-        plant.set_real(param, value);
+        plant.set_real(param, value.get<double>());
       }
       cout << endl;
       i++;
@@ -228,7 +228,13 @@ int main(int argc, char *const *argv) {
           t_in = t;
           console_out[1] = to_string(t_in) + " s, " + in["fmu_input"].dump();
           for (auto const &[k, v] : in["fmu_input"].items()) {
-            plant.set_real(k, v);
+            if (v.is_array()) {
+              plant.set_real(k, v.get<std::vector<double>>());
+            } else if(v.is_number()) {
+              plant.set_real(k, v.get<double>());
+            } else {
+              console_out[1] = " (skipped, not a number or array)";
+            }
           }
         }
 

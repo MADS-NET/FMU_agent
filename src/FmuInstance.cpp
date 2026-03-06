@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -49,6 +50,217 @@ std::string read_text_file(const fs::path &path) {
   std::ostringstream ss;
   ss << in.rdbuf();
   return ss.str();
+}
+
+std::string run_command_capture(const std::string &command);
+
+bool extract_xml_attribute(const std::string &tag, const std::string &attr,
+                           std::string &value) {
+  const std::string needle = attr + "=";
+  const std::size_t key_pos = tag.find(needle);
+  if (key_pos == std::string::npos) {
+    return false;
+  }
+  const std::size_t quote_pos = key_pos + needle.size();
+  if (quote_pos >= tag.size() ||
+      (tag[quote_pos] != '"' && tag[quote_pos] != '\'')) {
+    return false;
+  }
+  const char quote = tag[quote_pos];
+  const std::size_t value_begin = quote_pos + 1;
+  const std::size_t value_end = tag.find(quote, value_begin);
+  if (value_end == std::string::npos) {
+    return false;
+  }
+  value = tag.substr(value_begin, value_end - value_begin);
+  return true;
+}
+
+struct RealArrayMetadata {
+  bool _is_float64 = false;
+  bool _is_array = false;
+  std::size_t _rank = 0;
+  std::size_t _length = 0;
+};
+
+RealArrayMetadata parse_real_array_metadata(const std::string &xml,
+                                            const std::string &name) {
+  constexpr const char *tags[] = {"Float64",      "Float32", "Int8",   "UInt8",
+                                  "Int16",        "UInt16",  "Int32",  "UInt32",
+                                  "Int64",        "UInt64",  "Boolean", "String",
+                                  "Binary",       "Enumeration", "Clock"};
+
+  for (const auto *tag : tags) {
+    const std::string marker = std::string("<") + tag;
+    std::size_t pos = 0;
+    while ((pos = xml.find(marker, pos)) != std::string::npos) {
+      const std::size_t tag_end = xml.find('>', pos);
+      if (tag_end == std::string::npos) {
+        break;
+      }
+      const std::string header = xml.substr(pos, tag_end - pos + 1);
+      std::string var_name;
+      if (!extract_xml_attribute(header, "name", var_name) || var_name != name) {
+        pos = tag_end + 1;
+        continue;
+      }
+
+      RealArrayMetadata meta;
+      meta._is_float64 = std::string(tag) == "Float64";
+      if (header.size() >= 2 && header[header.size() - 2] == '/') {
+        return meta;
+      }
+
+      const std::string end_tag = std::string("</") + tag + ">";
+      const std::size_t close_pos = xml.find(end_tag, tag_end + 1);
+      if (close_pos == std::string::npos) {
+        throw std::runtime_error("Malformed modelDescription.xml for variable " +
+                                 name);
+      }
+
+      const std::string body = xml.substr(tag_end + 1, close_pos - tag_end - 1);
+      std::size_t dim_pos = 0;
+      while ((dim_pos = body.find("<Dimension", dim_pos)) != std::string::npos) {
+        const std::size_t dim_end = body.find('>', dim_pos);
+        if (dim_end == std::string::npos) {
+          throw std::runtime_error(
+              "Malformed Dimension tag in modelDescription.xml for variable " +
+              name);
+        }
+        const std::string dim_tag =
+            body.substr(dim_pos, dim_end - dim_pos + 1);
+        meta._is_array = true;
+        meta._rank++;
+
+        std::string start_value;
+        if (!extract_xml_attribute(dim_tag, "start", start_value)) {
+          throw std::runtime_error(
+              "Variable " + name +
+              " has non-literal or missing array dimension; unsupported");
+        }
+
+        std::size_t consumed = 0;
+        const unsigned long long len =
+            std::stoull(start_value, &consumed, 10);
+        if (consumed != start_value.size() || len == 0ULL) {
+          throw std::runtime_error(
+              "Variable " + name +
+              " has invalid array dimension in modelDescription.xml");
+        }
+        if (len > std::numeric_limits<std::size_t>::max()) {
+          throw std::runtime_error(
+              "Variable " + name +
+              " array dimension does not fit in host size_t");
+        }
+        if (meta._rank == 1) {
+          meta._length = static_cast<std::size_t>(len);
+        }
+        dim_pos = dim_end + 1;
+      }
+      return meta;
+    }
+  }
+
+  throw std::runtime_error("Variable not found in modelDescription.xml: " + name);
+}
+
+std::string read_model_description_xml(const std::string &fmu_path) {
+  const fs::path path(fmu_path);
+  if (fs::is_directory(path)) {
+    return read_text_file(path / "modelDescription.xml");
+  }
+
+#if defined(_WIN32)
+  const auto now =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const fs::path temp_dir =
+      fs::temp_directory_path() / ("fmu_xml_" + std::to_string(now));
+  try {
+    fs::create_directories(temp_dir);
+    const std::string extract_cmd = "tar -xf \"" + path.string() + "\" -C \"" +
+                                    temp_dir.string() + "\" modelDescription.xml";
+    run_command_capture(extract_cmd);
+    const std::string xml = read_text_file(temp_dir / "modelDescription.xml");
+    std::error_code ec;
+    fs::remove_all(temp_dir, ec);
+    return xml;
+  } catch (...) {
+    std::error_code ec;
+    fs::remove_all(temp_dir, ec);
+    throw;
+  }
+#else
+  const std::string quoted_fmu = shell_quote_posix(path.string());
+  return run_command_capture("unzip -p " + quoted_fmu + " modelDescription.xml");
+#endif
+}
+
+std::string parse_variable_dimensions_string(const std::string &xml,
+                                            const std::string &name) {
+  constexpr const char *tags[] = {"Float64",      "Float32", "Int8",   "UInt8",
+                                  "Int16",        "UInt16",  "Int32",  "UInt32",
+                                  "Int64",        "UInt64",  "Boolean", "String",
+                                  "Binary",       "Enumeration", "Clock"};
+
+  for (const auto *tag : tags) {
+    const std::string marker = std::string("<") + tag;
+    std::size_t pos = 0;
+    while ((pos = xml.find(marker, pos)) != std::string::npos) {
+      const std::size_t tag_end = xml.find('>', pos);
+      if (tag_end == std::string::npos) {
+        break;
+      }
+      const std::string header = xml.substr(pos, tag_end - pos + 1);
+      std::string var_name;
+      if (!extract_xml_attribute(header, "name", var_name) || var_name != name) {
+        pos = tag_end + 1;
+        continue;
+      }
+      if (header.size() >= 2 && header[header.size() - 2] == '/') {
+        return "";
+      }
+
+      const std::string end_tag = std::string("</") + tag + ">";
+      const std::size_t close_pos = xml.find(end_tag, tag_end + 1);
+      if (close_pos == std::string::npos) {
+        throw std::runtime_error("Malformed modelDescription.xml for variable " +
+                                 name);
+      }
+
+      const std::string body = xml.substr(tag_end + 1, close_pos - tag_end - 1);
+      std::vector<std::string> dims;
+      std::size_t dim_pos = 0;
+      while ((dim_pos = body.find("<Dimension", dim_pos)) != std::string::npos) {
+        const std::size_t dim_end = body.find('>', dim_pos);
+        if (dim_end == std::string::npos) {
+          throw std::runtime_error(
+              "Malformed Dimension tag in modelDescription.xml for variable " +
+              name);
+        }
+        const std::string dim_tag = body.substr(dim_pos, dim_end - dim_pos + 1);
+        std::string dim_value;
+        if (!extract_xml_attribute(dim_tag, "start", dim_value)) {
+          dim_value = "?";
+        }
+        dims.push_back(dim_value);
+        dim_pos = dim_end + 1;
+      }
+      if (dims.empty()) {
+        return "";
+      }
+      std::ostringstream ss;
+      ss << "[";
+      for (std::size_t i = 0; i < dims.size(); ++i) {
+        if (i > 0) {
+          ss << "x";
+        }
+        ss << dims[i];
+      }
+      ss << "]";
+      return ss.str();
+    }
+  }
+  return "";
 }
 
 std::string run_command_capture(const std::string &command) {
@@ -646,6 +858,27 @@ void FmuWrapper::set_real(const std::string &name, double value) {
   check_status(status, std::string("setFloat64 for variable ") + name);
 }
 
+void FmuWrapper::set_real(const std::string &name,
+                          const std::vector<double> &values) {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+  const std::size_t expected = resolve_real_array_length(name);
+  if (values.size() != expected) {
+    throw std::runtime_error("Size mismatch for variable " + name +
+                             ": expected " + std::to_string(expected) +
+                             ", got " + std::to_string(values.size()));
+  }
+  if (values.empty()) {
+    throw std::runtime_error("Cannot set empty array for variable " + name);
+  }
+
+  fmi3ValueReference vr = resolve_var_ref(name);
+  fmi3Status status =
+      fmi3_setFloat64(_instance, &vr, 1, values.data(), values.size());
+  check_status(status, std::string("setFloat64 array for variable ") + name);
+}
+
 double FmuWrapper::get_real(const std::string &name) const {
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");
@@ -660,6 +893,23 @@ double FmuWrapper::get_real(const std::string &name) const {
   return value;
 }
 
+void FmuWrapper::get_real(const std::string &name,
+                          std::vector<double> &values) const {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+  const std::size_t expected = resolve_real_array_length(name);
+  values.resize(expected);
+  if (values.empty()) {
+    throw std::runtime_error("Cannot get empty array for variable " + name);
+  }
+
+  fmi3ValueReference vr = resolve_var_ref(name);
+  fmi3Status status =
+      fmi3_getFloat64(_instance, &vr, 1, values.data(), values.size());
+  check_status(status, std::string("getFloat64 array for variable ") + name);
+}
+
 void FmuWrapper::list_variables(ostream &s) {
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");
@@ -668,21 +918,30 @@ void FmuWrapper::list_variables(ostream &s) {
   int vnum = fmi3_getNumberOfVariables(fmu);
   string name = fmi3_modelName(fmu);
   const int fw = 15;
+  const int tw = 18;
   s << style::bold << "Variables:" << endl
     << setw(fw) << "Name"
     << setw(fw) << "Description"
-    << setw(fw) << "Data type"
+    << setw(tw) << "Data type"
     << setw(fw) << "Causality"
     << setw(fw) << "Initial"
     << style::reset << endl;
   for (int i = 0; i < vnum; ++i) {
     auto v = fmi3_getVariableByIndex(fmu, i + 1);
+    const std::string var_name = fmi3_getVariableName(v);
     auto c = fmi3_getVariableCausality(v);
     if (c > fmi3Causality::fmi3CausalityCalculatedParameter)
       continue;
-    s << setw(fw) << fmi3_getVariableName(v)
+    std::string dtype = get_data_type_string(fmi3_getVariableDataType(v));
+    const std::string dims = resolve_var_dimensions(var_name);
+    if (!dims.empty()) {
+      // Convert "[3x2]" to "(3x2)" for compact table output.
+      dtype += "(" + dims.substr(1, dims.size() - 2) + ")";
+    }
+
+    s << setw(fw) << var_name
       << setw(fw) << fmi3_getVariableDescription(v)
-      << setw(fw) << get_data_type_string(fmi3_getVariableDataType(v))
+      << setw(tw) << dtype
       << setw(fw) << get_causality_string(c)
       << setw(fw) << get_initial_kind_string(fmi3_getVariableInitial(v))
       << endl;
@@ -825,8 +1084,15 @@ void FmuWrapper::get_status(json &status) {
         causality == fmi3Causality::fmi3CausalityCalculatedParameter) {
       continue;
     }
-    status[get_causality_string(causality)][name] =
-        value(name);
+    const std::string dims = resolve_var_dimensions(name);
+    const bool is_vector = !dims.empty() && dims.find('x') == std::string::npos;
+    if (is_vector) {
+      std::vector<double> values;
+      get_real(name, values);
+      status[get_causality_string(causality)][name] = values;
+    } else {
+      status[get_causality_string(causality)][name] = value(name);
+    }
   }
 }
 
@@ -1001,6 +1267,57 @@ fmi3ValueReference FmuWrapper::resolve_var_ref(const std::string &name) const {
   const_cast<FmuWrapper *>(this)->_var_cache[name] = vr;
 
   return vr;
+}
+
+size_t FmuWrapper::resolve_real_array_length(const std::string &name) const {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+
+  const auto cached = _real_array_len_cache.find(name);
+  if (cached != _real_array_len_cache.end()) {
+    return cached->second;
+  }
+
+  if (_model_description_xml.empty()) {
+    _model_description_xml = read_model_description_xml(_fmu_path);
+  }
+
+  const RealArrayMetadata meta =
+      parse_real_array_metadata(_model_description_xml, name);
+  if (!meta._is_float64) {
+    throw std::runtime_error("Variable " + name + " is not Float64");
+  }
+  if (!meta._is_array) {
+    throw std::runtime_error("Variable " + name + " is not an array");
+  }
+  if (meta._rank != 1) {
+    throw std::runtime_error("Variable " + name +
+                             " is not a 1-D array");
+  }
+
+  _real_array_len_cache[name] = meta._length;
+  return meta._length;
+}
+
+std::string FmuWrapper::resolve_var_dimensions(const std::string &name) const {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+
+  const auto cached = _var_dimensions_cache.find(name);
+  if (cached != _var_dimensions_cache.end()) {
+    return cached->second;
+  }
+
+  if (_model_description_xml.empty()) {
+    _model_description_xml = read_model_description_xml(_fmu_path);
+  }
+
+  const std::string dims =
+      parse_variable_dimensions_string(_model_description_xml, name);
+  _var_dimensions_cache[name] = dims;
+  return dims;
 }
 
 void FmuWrapper::check_status(fmi3Status status,

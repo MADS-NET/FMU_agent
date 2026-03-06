@@ -59,12 +59,14 @@ public:
     /// @param value Value to set
     /// @throws std::runtime_error if variable not found or set fails
     void set_real(const std::string& name, double value);
+    void set_real(const std::string& name, const std::vector<double>& values);
 
     /// Get a real-valued variable by name
     /// @param name Variable name
     /// @return Variable value
     /// @throws std::runtime_error if variable not found or get fails
     double get_real(const std::string& name) const;
+    void get_real(const std::string& name, std::vector<double>& values) const;
 
     /// Get current simulation time
     /// @return Current time
@@ -106,6 +108,9 @@ private:
 
     double _start_time, _current_time;
     std::unordered_map<std::string, fmi3ValueReference> _var_cache;
+    mutable std::unordered_map<std::string, size_t> _real_array_len_cache;
+    mutable std::unordered_map<std::string, std::string> _var_dimensions_cache;
+    mutable std::string _model_description_xml;
 
     // Static enum-to-string translation maps
     static const std::unordered_map<int, std::string> _initial_kind_map;
@@ -114,6 +119,8 @@ private:
 
     /// Resolve variable name to value reference
     fmi3ValueReference resolve_var_ref(const std::string& name) const;
+    size_t resolve_real_array_length(const std::string& name) const;
+    std::string resolve_var_dimensions(const std::string& name) const;
     
     /// Check FMI status and throw if error
     void check_status(fmi3Status status, const std::string& context) const;
