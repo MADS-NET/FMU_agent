@@ -60,6 +60,7 @@ public:
     /// @throws std::runtime_error if variable not found or set fails
     void set_real(const std::string& name, double value);
     void set_real(const std::string& name, const std::vector<double>& values);
+    void set_bool(const std::string& name, bool value);
 
     /// Get a real-valued variable by name
     /// @param name Variable name
@@ -67,6 +68,7 @@ public:
     /// @throws std::runtime_error if variable not found or get fails
     double get_real(const std::string& name) const;
     void get_real(const std::string& name, std::vector<double>& values) const;
+    bool get_bool(const std::string& name) const;
 
     /// Get current simulation time
     /// @return Current time

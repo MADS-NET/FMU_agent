@@ -858,6 +858,18 @@ void FmuWrapper::set_real(const std::string &name, double value) {
   check_status(status, std::string("setFloat64 for variable ") + name);
 }
 
+void FmuWrapper::set_bool(const std::string &name, bool value) {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+
+  fmi3ValueReference vr = resolve_var_ref(name);
+  const fmi3Boolean fmi_value = value;
+
+  fmi3Status status = fmi3_setBoolean(_instance, &vr, 1, &fmi_value, 1);
+  check_status(status, std::string("setBoolean for variable ") + name);
+}
+
 void FmuWrapper::set_real(const std::string &name,
                           const std::vector<double> &values) {
   if (!_instance || !_initialized) {
@@ -889,6 +901,20 @@ double FmuWrapper::get_real(const std::string &name) const {
 
   fmi3Status status = fmi3_getFloat64(_instance, &vr, 1, &value, 1);
   check_status(status, std::string("getFloat64 for variable ") + name);
+
+  return value;
+}
+
+bool FmuWrapper::get_bool(const std::string &name) const {
+  if (!_instance || !_initialized) {
+    throw std::runtime_error("FMU instance not initialized");
+  }
+
+  fmi3ValueReference vr = resolve_var_ref(name);
+  fmi3Boolean value = fmi3False;
+
+  fmi3Status status = fmi3_getBoolean(_instance, &vr, 1, &value, 1);
+  check_status(status, std::string("getBoolean for variable ") + name);
 
   return value;
 }
