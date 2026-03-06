@@ -46,7 +46,12 @@ bool inspect_fmu(filesystem::path const &path) {
        << "\nrelative_tol = 1e-4"
        << "\nabsolute_tol = 1e-5"
        << "\nhmin_tol = 1e-10" 
-       << fg::reset << endl;
+       << "\n[fmu_" << model_name << ".parameters]"
+       << "\n# default values from FMU";
+  for (const auto &param : fmu.get_param_names()) {
+    cout << "\n" << param << " = " << fmu.get_real(param);
+  }
+  cout << fg::reset << endl;
 
   cout << style::bold << "\nDependencies:" << style::reset << endl;
   auto deps = fmu.get_binary_dependencies();
@@ -168,6 +173,26 @@ int main(int argc, char *const *argv) {
   plant._solver_params._rel_tol = 1e-5;
   plant._solver_params._abs_tol = 1e-7;
   plant._solver_params._hmin = 1e-12;
+
+  if (settings.contains("parameters")) {
+    cout << style::bold << "Overriding default FMU parameters (" 
+         << settings["parameters"].size() << ") from settings:" 
+         << style::reset << endl;
+    int i = 0;
+    for (auto const &[param, value] : settings["parameters"].items()) {
+      cout << "  " << param << ": " << style::bold << value 
+           << style::reset;
+      if (!value.is_number()) {
+        cout << fg::red << "  NOT A NUMBER, SKIPPING" << fg::reset;
+      } else {
+        plant.set_real(param, value);
+      }
+      cout << endl;
+      i++;
+    }
+    cout << "  " << i << " parameters overridden\n\n\n" << endl;
+  }
+
 
   auto last_timestep = chrono::steady_clock::now();
   chrono::steady_clock::time_point now;

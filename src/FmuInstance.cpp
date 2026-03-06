@@ -820,7 +820,12 @@ void FmuWrapper::get_status(json &status) {
   for (int i = 0; i < vnum; ++i) {
     auto v = fmi3_getVariableByIndex(fmu, i + 1);
     name = fmi3_getVariableName(v);
-    status[get_causality_string(fmi3_getVariableCausality(v))][name] =
+    auto causality = fmi3_getVariableCausality(v);
+    if (causality == fmi3Causality::fmi3CausalityLocal ||
+        causality == fmi3Causality::fmi3CausalityCalculatedParameter) {
+      continue;
+    }
+    status[get_causality_string(causality)][name] =
         value(name);
   }
 }
