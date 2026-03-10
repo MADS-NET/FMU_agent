@@ -1,112 +1,157 @@
 #include "linear_axis_macros.h"
 #include "linear_axis.h"
-#include "rtwtypes.h"
 #include "linear_axis_private.h"
+#include "rtwtypes.h"
 #include <string.h>
+#include "zero_crossing_types.h"
+#include <math.h>
 
 B_linear_axis_T linear_axis_B;
 X_linear_axis_T linear_axis_X;
 XDis_linear_axis_T linear_axis_XDis;
 DW_linear_axis_T linear_axis_DW;
+PrevZCX_linear_axis_T linear_axis_PrevZCX;
 ExtU_linear_axis_T linear_axis_U;
 ExtY_linear_axis_T linear_axis_Y;
 static RT_MODEL_linear_axis_T linear_axis_M_;
 RT_MODEL_linear_axis_T *const linear_axis_M = &linear_axis_M_;
-real_T look1_binlxpw(real_T u0, const real_T bp0[], const real_T table[],
-                     uint32_T maxIndex)
+real_T rt_roundd_snf(real_T u)
 {
-  real_T frac;
-  real_T yL_0d0;
-  uint32_T iLeft;
-  if (u0 <= bp0[0U]) {
-    iLeft = 0U;
-    frac = (u0 - bp0[0U]) / (bp0[1U] - bp0[0U]);
-  } else if (u0 < bp0[maxIndex]) {
-    uint32_T bpIdx;
-    uint32_T iRght;
-    bpIdx = maxIndex >> 1U;
-    iLeft = 0U;
-    iRght = maxIndex;
-    while (iRght - iLeft > 1U) {
-      if (u0 < bp0[bpIdx]) {
-        iRght = bpIdx;
-      } else {
-        iLeft = bpIdx;
-      }
-
-      bpIdx = (iRght + iLeft) >> 1U;
+  real_T y;
+  if (fabs(u) < 4.503599627370496E+15) {
+    if (u >= 0.5) {
+      y = floor(u + 0.5);
+    } else if (u > -0.5) {
+      y = u * 0.0;
+    } else {
+      y = ceil(u - 0.5);
     }
-
-    frac = (u0 - bp0[iLeft]) / (bp0[iLeft + 1U] - bp0[iLeft]);
   } else {
-    iLeft = maxIndex - 1U;
-    frac = (u0 - bp0[maxIndex - 1U]) / (bp0[maxIndex] - bp0[maxIndex - 1U]);
+    y = u;
   }
 
-  yL_0d0 = table[iLeft];
-  return (table[iLeft + 1U] - yL_0d0) * frac + yL_0d0;
+  return y;
 }
 
 void linear_axis_output(void)
 {
-  real_T rtb_Sum;
-  real_T rtb_Switch2;
+  real_T rtb_error;
+  boolean_T didZcEventOccur;
   boolean_T tmp;
-  linear_axis_B.s_dot = linear_axis_X.Integrator2_CSTATE;
-  linear_axis_Y.v = linear_axis_B.s_dot;
-  linear_axis_Y.s = linear_axis_X.Integrator3_CSTATE;
-  linear_axis_B.omega = linear_axis_P.g_gb[0] * linear_axis_B.s_dot;
   tmp = rtsiIsModeUpdateTimeStep(&linear_axis_M->solverInfo);
   if (tmp) {
-    linear_axis_DW.Abs_MODE = (linear_axis_B.omega >= 0.0);
+    didZcEventOccur = (linear_axis_U.reset &&
+                       (linear_axis_PrevZCX.Integrator1_Reset_ZCE != POS_ZCSIG));
+    linear_axis_PrevZCX.Integrator1_Reset_ZCE = linear_axis_U.reset;
+    if (didZcEventOccur) {
+      linear_axis_X.position = linear_axis_P.X0;
+    }
+
+    didZcEventOccur = (linear_axis_U.reset &&
+                       (linear_axis_PrevZCX.Integrator_Reset_ZCE != POS_ZCSIG));
+    linear_axis_PrevZCX.Integrator_Reset_ZCE = linear_axis_U.reset;
+    if (didZcEventOccur) {
+      linear_axis_X.speed = linear_axis_P.Xaxis_v0;
+    }
+
+    didZcEventOccur = (linear_axis_U.reset &&
+                       (linear_axis_PrevZCX.Integrator_Reset_ZCE_i != POS_ZCSIG));
+    linear_axis_PrevZCX.Integrator_Reset_ZCE_i = linear_axis_U.reset;
+    if (didZcEventOccur) {
+      linear_axis_X.Integrator_CSTATE =
+        linear_axis_P.PIDController_InitialConditionForIntegrator;
+    }
+
+    didZcEventOccur = (linear_axis_U.reset &&
+                       (linear_axis_PrevZCX.Filter_Reset_ZCE != POS_ZCSIG));
+    linear_axis_PrevZCX.Filter_Reset_ZCE = linear_axis_U.reset;
+    if (didZcEventOccur) {
+      linear_axis_X.Filter_CSTATE =
+        linear_axis_P.PIDController_InitialConditionForFilter;
+    }
   }
 
-  linear_axis_B.maxT = look1_binlxpw((linear_axis_DW.Abs_MODE > 0 ?
-    linear_axis_B.omega : -linear_axis_B.omega) * linear_axis_P.Gain_Gain,
-    linear_axis_P.uDLookupTable_bp01Data, linear_axis_P.uDLookupTable_tableData,
-    6U);
-  rtb_Sum = linear_axis_U.setpoint - linear_axis_X.Integrator3_CSTATE;
-  linear_axis_B.FilterCoefficient = (linear_axis_P.PIDController_D * rtb_Sum -
-    linear_axis_X.Filter_CSTATE) * linear_axis_P.PIDController_N;
-  linear_axis_B.Sum = (linear_axis_P.PIDController_P * rtb_Sum +
+  linear_axis_Y.X = linear_axis_P.Gain_Gain * linear_axis_X.position;
+  linear_axis_B.v = linear_axis_X.speed;
+  linear_axis_Y.Vx = linear_axis_P.Gain1_Gain * linear_axis_B.v;
+  rtb_error = linear_axis_P.tom_Gain * linear_axis_U.setpoint - rt_roundd_snf
+    (linear_axis_X.position / linear_axis_P.res) * linear_axis_P.res;
+  linear_axis_B.FilterCoefficient = (linear_axis_P.XD * rtb_error -
+    linear_axis_X.Filter_CSTATE) * linear_axis_P.XN;
+  linear_axis_B.Sum = (linear_axis_P.XP * rtb_error +
                        linear_axis_X.Integrator_CSTATE) +
     linear_axis_B.FilterCoefficient;
+  linear_axis_B.ZeroGain = linear_axis_P.ZeroGain_Gain * linear_axis_B.Sum;
   if (tmp) {
-    linear_axis_DW.Saturation_MODE = linear_axis_B.Sum >=
-      linear_axis_P.Saturation_UpperSat ? 1 : linear_axis_B.Sum >
-      linear_axis_P.Saturation_LowerSat ? 0 : -1;
+    if (linear_axis_B.Sum > linear_axis_P.Xsat) {
+      linear_axis_DW.DeadZone_MODE = 1;
+    } else if (linear_axis_B.Sum >= -linear_axis_P.Xsat) {
+      linear_axis_DW.DeadZone_MODE = 0;
+    } else {
+      linear_axis_DW.DeadZone_MODE = -1;
+    }
   }
 
-  linear_axis_B.Gain5 = (linear_axis_DW.Saturation_MODE == 1 ?
-    linear_axis_P.Saturation_UpperSat : linear_axis_DW.Saturation_MODE == -1 ?
-    linear_axis_P.Saturation_LowerSat : linear_axis_B.Sum) *
-    linear_axis_P.Gain5_Gain;
-  if (tmp) {
-    linear_axis_DW.LowerRelop1_Mode = (linear_axis_B.Gain5 > linear_axis_B.maxT);
-  }
-
-  linear_axis_B.minT = linear_axis_P.Gain2_Gain * linear_axis_B.maxT;
-  if (tmp) {
-    linear_axis_DW.UpperRelop_Mode = (linear_axis_B.Gain5 < linear_axis_B.minT);
-  }
-
-  if (linear_axis_DW.LowerRelop1_Mode) {
-    rtb_Switch2 = linear_axis_B.maxT;
-  } else if (linear_axis_DW.UpperRelop_Mode) {
-    rtb_Switch2 = linear_axis_B.minT;
+  if (linear_axis_DW.DeadZone_MODE == 1) {
+    linear_axis_B.DeadZone = linear_axis_B.Sum - linear_axis_P.Xsat;
+  } else if (linear_axis_DW.DeadZone_MODE == -1) {
+    linear_axis_B.DeadZone = linear_axis_B.Sum - (-linear_axis_P.Xsat);
   } else {
-    rtb_Switch2 = linear_axis_B.Gain5;
+    linear_axis_B.DeadZone = 0.0;
   }
 
-  linear_axis_Y.T = rtb_Switch2;
-  linear_axis_B.IntegralGain = linear_axis_P.PIDController_I * rtb_Sum;
-  linear_axis_B.s_ddot = 1.0 / linear_axis_P.R[0] * rtb_Switch2 * (1.0 /
-    linear_axis_P.mass[0]) - linear_axis_P.r_v[0] / linear_axis_P.mass[0] *
-    linear_axis_B.s_dot;
+  linear_axis_B.IntegralGain = linear_axis_P.XI * rtb_error;
+  if (tmp) {
+    linear_axis_DW.NotEqual_Mode = (linear_axis_B.ZeroGain !=
+      linear_axis_B.DeadZone);
+    if (linear_axis_B.DeadZone > 0.0) {
+      linear_axis_DW.SignPreSat_MODE = 1;
+    } else if (linear_axis_B.DeadZone < 0.0) {
+      linear_axis_DW.SignPreSat_MODE = -1;
+    } else {
+      linear_axis_DW.SignPreSat_MODE = 0;
+    }
+
+    if (linear_axis_B.IntegralGain > 0.0) {
+      linear_axis_DW.SignPreIntegrator_MODE = 1;
+    } else if (linear_axis_B.IntegralGain < 0.0) {
+      linear_axis_DW.SignPreIntegrator_MODE = -1;
+    } else {
+      linear_axis_DW.SignPreIntegrator_MODE = 0;
+    }
+  }
+
+  linear_axis_B.AND3 = (linear_axis_DW.NotEqual_Mode && ((int8_T)
+    linear_axis_DW.SignPreSat_MODE == (int8_T)
+    linear_axis_DW.SignPreIntegrator_MODE));
+  if (rtmIsMajorTimeStep(linear_axis_M)) {
+    linear_axis_B.Memory = linear_axis_DW.Memory_PreviousInput;
+  }
+
+  if (linear_axis_B.Memory) {
+    linear_axis_B.Switch = linear_axis_P.Constant1_Value;
+  } else {
+    linear_axis_B.Switch = linear_axis_B.IntegralGain;
+  }
+
+  if (tmp) {
+    linear_axis_DW.Saturation_MODE = linear_axis_B.Sum >= linear_axis_P.Xsat ? 1
+      : linear_axis_B.Sum > -linear_axis_P.Xsat ? 0 : -1;
+  }
+
+  linear_axis_B.a = (((linear_axis_DW.Saturation_MODE == 1 ? linear_axis_P.Xsat :
+                       linear_axis_DW.Saturation_MODE == -1 ?
+                       -linear_axis_P.Xsat : linear_axis_B.Sum) +
+                      linear_axis_U.noiseX) - linear_axis_P.Xdc *
+                     linear_axis_B.v) * (1.0 / linear_axis_P.Xm);
 }
 
 void linear_axis_update(void)
 {
+  if (rtmIsMajorTimeStep(linear_axis_M)) {
+    linear_axis_DW.Memory_PreviousInput = linear_axis_B.AND3;
+  }
+
   if (rtmIsMajorTimeStep(linear_axis_M)) {
     if (!(++linear_axis_M->Timing.clockTick0)) {
       ++linear_axis_M->Timing.clockTickH0;
@@ -128,33 +173,43 @@ void linear_axis_derivatives(void)
 {
   XDot_linear_axis_T *_rtXdot;
   _rtXdot = ((XDot_linear_axis_T *) linear_axis_M->derivs);
-  _rtXdot->Integrator2_CSTATE = linear_axis_B.s_ddot;
-  _rtXdot->Integrator3_CSTATE = linear_axis_B.s_dot;
-  _rtXdot->Integrator_CSTATE = linear_axis_B.IntegralGain;
+  _rtXdot->position = linear_axis_B.v;
+  _rtXdot->speed = linear_axis_B.a;
+  _rtXdot->Integrator_CSTATE = linear_axis_B.Switch;
   _rtXdot->Filter_CSTATE = linear_axis_B.FilterCoefficient;
 }
 
 void linear_axis_zeroCrossings(void)
 {
   ZCV_linear_axis_T *_rtZCSV;
+  real_T DeadZone_LwrReg_ZC_tmp;
+  real_T DeadZone_UprReg_ZC_tmp;
   _rtZCSV = ((ZCV_linear_axis_T *) linear_axis_M->zcSignalVector);
-  _rtZCSV->Abs_AbsZc_ZC = linear_axis_B.omega;
-  _rtZCSV->Saturation_UprLim_ZC = linear_axis_B.Sum -
-    linear_axis_P.Saturation_UpperSat;
-  _rtZCSV->Saturation_LwrLim_ZC = linear_axis_B.Sum -
-    linear_axis_P.Saturation_LowerSat;
-  _rtZCSV->LowerRelop1_RelopInput_ZC = linear_axis_B.Gain5 - linear_axis_B.maxT;
-  _rtZCSV->UpperRelop_RelopInput_ZC = linear_axis_B.Gain5 - linear_axis_B.minT;
+  DeadZone_LwrReg_ZC_tmp = linear_axis_B.Sum - (-linear_axis_P.Xsat);
+  _rtZCSV->DeadZone_LwrReg_ZC = DeadZone_LwrReg_ZC_tmp;
+  DeadZone_UprReg_ZC_tmp = linear_axis_B.Sum - linear_axis_P.Xsat;
+  _rtZCSV->DeadZone_UprReg_ZC = DeadZone_UprReg_ZC_tmp;
+  _rtZCSV->NotEqual_RelopInput_ZC = linear_axis_B.ZeroGain -
+    linear_axis_B.DeadZone;
+  _rtZCSV->SignPreSat_Input_ZC = linear_axis_B.DeadZone;
+  _rtZCSV->SignPreIntegrator_Input_ZC = linear_axis_B.IntegralGain;
+  _rtZCSV->Saturation_UprLim_ZC = DeadZone_UprReg_ZC_tmp;
+  _rtZCSV->Saturation_LwrLim_ZC = DeadZone_LwrReg_ZC_tmp;
 }
 
 void linear_axis_initialize(void)
 {
-  linear_axis_X.Integrator2_CSTATE = linear_axis_P.Integrator2_IC;
-  linear_axis_X.Integrator3_CSTATE = linear_axis_P.Integrator3_IC;
+  linear_axis_PrevZCX.Integrator1_Reset_ZCE = UNINITIALIZED_ZCSIG;
+  linear_axis_PrevZCX.Integrator_Reset_ZCE = UNINITIALIZED_ZCSIG;
+  linear_axis_PrevZCX.Integrator_Reset_ZCE_i = UNINITIALIZED_ZCSIG;
+  linear_axis_PrevZCX.Filter_Reset_ZCE = UNINITIALIZED_ZCSIG;
+  linear_axis_X.position = linear_axis_P.X0;
+  linear_axis_X.speed = linear_axis_P.Xaxis_v0;
   linear_axis_X.Integrator_CSTATE =
     linear_axis_P.PIDController_InitialConditionForIntegrator;
   linear_axis_X.Filter_CSTATE =
     linear_axis_P.PIDController_InitialConditionForFilter;
+  linear_axis_DW.Memory_PreviousInput = linear_axis_P.Memory_InitialCondition;
 }
 
 void linear_axis_terminate(void)
@@ -205,8 +260,11 @@ RT_MODEL_linear_axis_T *linear_axis(void)
   rtsiSetSolverData(&linear_axis_M->solverInfo, (void *)&linear_axis_M->intgData);
 
   {
-    static uint8_T zcAttributes[5] = { (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
-      (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL) };
+    static uint8_T zcAttributes[11] = { (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
+      SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
+      SL_ZCS_EVENT_ALL_UP), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
+      (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
+      (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL) };
 
     rtsiSetSolverZcSignalAttrib(&linear_axis_M->solverInfo,
       zcAttributes);
@@ -221,7 +279,7 @@ RT_MODEL_linear_axis_T *linear_axis(void)
 
   rtsiSetSolverName(&linear_axis_M->solverInfo,"ode3");
   rtmSetTPtr(linear_axis_M, &linear_axis_M->Timing.tArray[0]);
-  linear_axis_M->Timing.stepSize0 = 0.001;
+  linear_axis_M->Timing.stepSize0 = 1.0;
   (void) memset(((void *) &linear_axis_B), 0,
                 sizeof(B_linear_axis_T));
 
@@ -237,7 +295,7 @@ RT_MODEL_linear_axis_T *linear_axis(void)
 
   (void) memset((void *)&linear_axis_DW, 0,
                 sizeof(DW_linear_axis_T));
-  linear_axis_U.setpoint = 0.0;
+  (void)memset(&linear_axis_U, 0, sizeof(ExtU_linear_axis_T));
   (void)memset(&linear_axis_Y, 0, sizeof(ExtY_linear_axis_T));
   return linear_axis_M;
 }

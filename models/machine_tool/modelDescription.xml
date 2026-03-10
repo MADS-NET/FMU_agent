@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<fmiModelDescription fmiVersion="3.0" generationDateAndTime="2026-03-06T14:25:27Z" generationTool="Simulink (R2025b)" instantiationToken="{8afc0b3d-1538-92ff-033a-ac53876b2178}" modelName="machine_tool" variableNamingConvention="structured" version="1.14">
+  <ModelExchange canBeInstantiatedOnlyOncePerProcess="true" canGetAndSetFMUState="true" canSerializeFMUState="true" modelIdentifier="machine_tool" needsExecutionTool="false"/>
+  <UnitDefinitions>
+    <Unit name="N"/>
+    <Unit name="mm"/>
+    <Unit name="mm/min"/>
+  </UnitDefinitions>
+  <DefaultExperiment startTime="0" stepSize="1" stopTime="50"/>
+  <ModelVariables>
+    <Float64 causality="input" description="setpoint" initial="exact" name="setpoint" start="0 0 0" unit="mm" valueReference="0" variability="continuous">
+      <Dimension start="3"/>
+    </Float64>
+    <Float64 causality="input" description="noise" initial="exact" name="noise" start="0 0 0" unit="N" valueReference="1" variability="continuous">
+      <Dimension start="3"/>
+    </Float64>
+    <Boolean causality="input" description="reset" initial="exact" name="reset" start="0" valueReference="87" variability="discrete"/>
+    <Float64 causality="output" description="position" initial="calculated" name="position" unit="mm" valueReference="2" variability="continuous">
+      <Dimension start="3"/>
+    </Float64>
+    <Float64 causality="output" description="speed" initial="calculated" name="speed" unit="mm/min" valueReference="3" variability="continuous">
+      <Dimension start="3"/>
+    </Float64>
+    <Float64 causality="independent" description="time" name="time" valueReference="4" variability="continuous"/>
+    <Float64 causality="local" description="ContState1" initial="calculated" name="ContState1" valueReference="5" variability="continuous"/>
+    <Float64 causality="local" description="ContState2" initial="calculated" name="ContState2" valueReference="6" variability="continuous"/>
+    <Float64 causality="local" description="ContState3" initial="calculated" name="ContState3" valueReference="7" variability="continuous"/>
+    <Float64 causality="local" description="ContState4" initial="calculated" name="ContState4" valueReference="8" variability="continuous"/>
+    <Float64 causality="local" description="ContState5" initial="calculated" name="ContState5" valueReference="9" variability="continuous"/>
+    <Float64 causality="local" description="ContState6" initial="calculated" name="ContState6" valueReference="10" variability="continuous"/>
+    <Float64 causality="local" description="ContState7" initial="calculated" name="ContState7" valueReference="11" variability="continuous"/>
+    <Float64 causality="local" description="ContState8" initial="calculated" name="ContState8" valueReference="12" variability="continuous"/>
+    <Float64 causality="local" description="ContState9" initial="calculated" name="ContState9" valueReference="13" variability="continuous"/>
+    <Float64 causality="local" description="ContState10" initial="calculated" name="ContState10" valueReference="14" variability="continuous"/>
+    <Float64 causality="local" description="ContState11" initial="calculated" name="ContState11" valueReference="15" variability="continuous"/>
+    <Float64 causality="local" description="ContState12" initial="calculated" name="ContState12" valueReference="16" variability="continuous"/>
+    <Float64 causality="local" derivative="5" description="Deriv1" initial="calculated" name="Deriv1" valueReference="17" variability="continuous"/>
+    <Float64 causality="local" derivative="6" description="Deriv2" initial="calculated" name="Deriv2" valueReference="18" variability="continuous"/>
+    <Float64 causality="local" derivative="7" description="Deriv3" initial="calculated" name="Deriv3" valueReference="19" variability="continuous"/>
+    <Float64 causality="local" derivative="8" description="Deriv4" initial="calculated" name="Deriv4" valueReference="20" variability="continuous"/>
+    <Float64 causality="local" derivative="9" description="Deriv5" initial="calculated" name="Deriv5" valueReference="21" variability="continuous"/>
+    <Float64 causality="local" derivative="10" description="Deriv6" initial="calculated" name="Deriv6" valueReference="22" variability="continuous"/>
+    <Float64 causality="local" derivative="11" description="Deriv7" initial="calculated" name="Deriv7" valueReference="23" variability="continuous"/>
+    <Float64 causality="local" derivative="12" description="Deriv8" initial="calculated" name="Deriv8" valueReference="24" variability="continuous"/>
+    <Float64 causality="local" derivative="13" description="Deriv9" initial="calculated" name="Deriv9" valueReference="25" variability="continuous"/>
+    <Float64 causality="local" derivative="14" description="Deriv10" initial="calculated" name="Deriv10" valueReference="26" variability="continuous"/>
+    <Float64 causality="local" derivative="15" description="Deriv11" initial="calculated" name="Deriv11" valueReference="27" variability="continuous"/>
+    <Float64 causality="local" derivative="16" description="Deriv12" initial="calculated" name="Deriv12" valueReference="28" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator1" initial="calculated" name="EventIndicator1" valueReference="29" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator2" initial="calculated" name="EventIndicator2" valueReference="30" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator3" initial="calculated" name="EventIndicator3" valueReference="31" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator4" initial="calculated" name="EventIndicator4" valueReference="32" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator5" initial="calculated" name="EventIndicator5" valueReference="33" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator6" initial="calculated" name="EventIndicator6" valueReference="34" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator7" initial="calculated" name="EventIndicator7" valueReference="35" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator8" initial="calculated" name="EventIndicator8" valueReference="36" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator9" initial="calculated" name="EventIndicator9" valueReference="37" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator10" initial="calculated" name="EventIndicator10" valueReference="38" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator11" initial="calculated" name="EventIndicator11" valueReference="39" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator12" initial="calculated" name="EventIndicator12" valueReference="40" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator13" initial="calculated" name="EventIndicator13" valueReference="41" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator14" initial="calculated" name="EventIndicator14" valueReference="42" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator15" initial="calculated" name="EventIndicator15" valueReference="43" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator16" initial="calculated" name="EventIndicator16" valueReference="44" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator17" initial="calculated" name="EventIndicator17" valueReference="45" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator18" initial="calculated" name="EventIndicator18" valueReference="46" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator19" initial="calculated" name="EventIndicator19" valueReference="47" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator20" initial="calculated" name="EventIndicator20" valueReference="48" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator21" initial="calculated" name="EventIndicator21" valueReference="49" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator22" initial="calculated" name="EventIndicator22" valueReference="50" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator23" initial="calculated" name="EventIndicator23" valueReference="51" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator24" initial="calculated" name="EventIndicator24" valueReference="52" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator25" initial="calculated" name="EventIndicator25" valueReference="53" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator26" initial="calculated" name="EventIndicator26" valueReference="54" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator27" initial="calculated" name="EventIndicator27" valueReference="55" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator28" initial="calculated" name="EventIndicator28" valueReference="56" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator29" initial="calculated" name="EventIndicator29" valueReference="57" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator30" initial="calculated" name="EventIndicator30" valueReference="58" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator31" initial="calculated" name="EventIndicator31" valueReference="59" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator32" initial="calculated" name="EventIndicator32" valueReference="60" variability="continuous"/>
+    <Float64 causality="local" description="EventIndicator33" initial="calculated" name="EventIndicator33" valueReference="61" variability="continuous"/>
+    <Float64 causality="parameter" description="X0" initial="exact" name="X0" start="0" valueReference="62" variability="tunable"/>
+    <Float64 causality="parameter" description="XD" initial="exact" name="XD" start="100" valueReference="63" variability="tunable"/>
+    <Float64 causality="parameter" description="XI" initial="exact" name="XI" start="0.001" valueReference="64" variability="tunable"/>
+    <Float64 causality="parameter" description="XN" initial="exact" name="XN" start="100" valueReference="65" variability="tunable"/>
+    <Float64 causality="parameter" description="XP" initial="exact" name="XP" start="0.3" valueReference="66" variability="tunable"/>
+    <Float64 causality="parameter" description="Xdc" initial="exact" name="Xdc" start="0.1" valueReference="67" variability="tunable"/>
+    <Float64 causality="parameter" description="Xm" initial="exact" name="Xm" start="100" valueReference="68" variability="tunable"/>
+    <Float64 causality="parameter" description="Xsat" initial="exact" name="Xsat" start="10000" valueReference="69" variability="tunable"/>
+    <Float64 causality="parameter" description="Y0" initial="exact" name="Y0" start="0" valueReference="70" variability="tunable"/>
+    <Float64 causality="parameter" description="YD" initial="exact" name="YD" start="100" valueReference="71" variability="tunable"/>
+    <Float64 causality="parameter" description="YI" initial="exact" name="YI" start="0.001" valueReference="72" variability="tunable"/>
+    <Float64 causality="parameter" description="YN" initial="exact" name="YN" start="100" valueReference="73" variability="tunable"/>
+    <Float64 causality="parameter" description="YP" initial="exact" name="YP" start="0.3" valueReference="74" variability="tunable"/>
+    <Float64 causality="parameter" description="Ydc" initial="exact" name="Ydc" start="0.1" valueReference="75" variability="tunable"/>
+    <Float64 causality="parameter" description="Ym" initial="exact" name="Ym" start="100" valueReference="76" variability="tunable"/>
+    <Float64 causality="parameter" description="Ysat" initial="exact" name="Ysat" start="10000" valueReference="77" variability="tunable"/>
+    <Float64 causality="parameter" description="Z0" initial="exact" name="Z0" start="0" valueReference="78" variability="tunable"/>
+    <Float64 causality="parameter" description="ZD" initial="exact" name="ZD" start="100" valueReference="79" variability="tunable"/>
+    <Float64 causality="parameter" description="ZI" initial="exact" name="ZI" start="0.001" valueReference="80" variability="tunable"/>
+    <Float64 causality="parameter" description="ZN" initial="exact" name="ZN" start="100" valueReference="81" variability="tunable"/>
+    <Float64 causality="parameter" description="ZP" initial="exact" name="ZP" start="0.3" valueReference="82" variability="tunable"/>
+    <Float64 causality="parameter" description="Zdc" initial="exact" name="Zdc" start="0.1" valueReference="83" variability="tunable"/>
+    <Float64 causality="parameter" description="Zm" initial="exact" name="Zm" start="100" valueReference="84" variability="tunable"/>
+    <Float64 causality="parameter" description="Zsat" initial="exact" name="Zsat" start="10000" valueReference="85" variability="tunable"/>
+    <Float64 causality="parameter" description="res" initial="exact" name="res" start="1e-06" valueReference="86" variability="tunable"/>
+  </ModelVariables>
+  <ModelStructure>
+    <Output valueReference="2"/>
+    <Output valueReference="3"/>
+    <ContinuousStateDerivative valueReference="17"/>
+    <ContinuousStateDerivative valueReference="18"/>
+    <ContinuousStateDerivative valueReference="19"/>
+    <ContinuousStateDerivative valueReference="20"/>
+    <ContinuousStateDerivative valueReference="21"/>
+    <ContinuousStateDerivative valueReference="22"/>
+    <ContinuousStateDerivative valueReference="23"/>
+    <ContinuousStateDerivative valueReference="24"/>
+    <ContinuousStateDerivative valueReference="25"/>
+    <ContinuousStateDerivative valueReference="26"/>
+    <ContinuousStateDerivative valueReference="27"/>
+    <ContinuousStateDerivative valueReference="28"/>
+    <InitialUnknown valueReference="2"/>
+    <InitialUnknown valueReference="3"/>
+    <InitialUnknown valueReference="5"/>
+    <InitialUnknown valueReference="6"/>
+    <InitialUnknown valueReference="7"/>
+    <InitialUnknown valueReference="8"/>
+    <InitialUnknown valueReference="9"/>
+    <InitialUnknown valueReference="10"/>
+    <InitialUnknown valueReference="11"/>
+    <InitialUnknown valueReference="12"/>
+    <InitialUnknown valueReference="13"/>
+    <InitialUnknown valueReference="14"/>
+    <InitialUnknown valueReference="15"/>
+    <InitialUnknown valueReference="16"/>
+    <InitialUnknown valueReference="17"/>
+    <InitialUnknown valueReference="18"/>
+    <InitialUnknown valueReference="19"/>
+    <InitialUnknown valueReference="20"/>
+    <InitialUnknown valueReference="21"/>
+    <InitialUnknown valueReference="22"/>
+    <InitialUnknown valueReference="23"/>
+    <InitialUnknown valueReference="24"/>
+    <InitialUnknown valueReference="25"/>
+    <InitialUnknown valueReference="26"/>
+    <InitialUnknown valueReference="27"/>
+    <InitialUnknown valueReference="28"/>
+    <EventIndicator valueReference="29"/>
+    <EventIndicator valueReference="30"/>
+    <EventIndicator valueReference="31"/>
+    <EventIndicator valueReference="32"/>
+    <EventIndicator valueReference="33"/>
+    <EventIndicator valueReference="34"/>
+    <EventIndicator valueReference="35"/>
+    <EventIndicator valueReference="36"/>
+    <EventIndicator valueReference="37"/>
+    <EventIndicator valueReference="38"/>
+    <EventIndicator valueReference="39"/>
+    <EventIndicator valueReference="40"/>
+    <EventIndicator valueReference="41"/>
+    <EventIndicator valueReference="42"/>
+    <EventIndicator valueReference="43"/>
+    <EventIndicator valueReference="44"/>
+    <EventIndicator valueReference="45"/>
+    <EventIndicator valueReference="46"/>
+    <EventIndicator valueReference="47"/>
+    <EventIndicator valueReference="48"/>
+    <EventIndicator valueReference="49"/>
+    <EventIndicator valueReference="50"/>
+    <EventIndicator valueReference="51"/>
+    <EventIndicator valueReference="52"/>
+    <EventIndicator valueReference="53"/>
+    <EventIndicator valueReference="54"/>
+    <EventIndicator valueReference="55"/>
+    <EventIndicator valueReference="56"/>
+    <EventIndicator valueReference="57"/>
+    <EventIndicator valueReference="58"/>
+    <EventIndicator valueReference="59"/>
+    <EventIndicator valueReference="60"/>
+    <EventIndicator valueReference="61"/>
+  </ModelStructure>
+  <Annotations>
+    <Annotation type="com.mathworks.Simulink">
+      <Simulink>
+        <ImportCompatibility FMUProduct="standalone FMU" canSourceFileCodeGeneration="true" requireMATLABOnPath="no" requireRelease="all"/>
+        <SimulinkModelInterface>
+          <Inport blockPath="machine_tool/setpoint" dataType="double" dimension="[3]" portName="setpoint" portNumber="1" sampleTime="[0 0]" uniquePortName="setpoint" unit="mm"/>
+          <Inport blockPath="machine_tool/noise" dataType="double" dimension="[3]" portName="noise" portNumber="2" sampleTime="[0 0]" uniquePortName="noise" unit="N"/>
+          <Inport blockPath="machine_tool/reset" dataType="boolean" dimension="[1]" portName="reset" portNumber="3" sampleTime="[0 0]" uniquePortName="reset" unit=""/>
+          <Outport blockPath="machine_tool/position" dataType="double" dimension="[3]" portName="position" portNumber="1" sampleTime="[0 0]" uniquePortName="position" unit="mm"/>
+          <Outport blockPath="machine_tool/speed" dataType="double" dimension="[3]" portName="speed" portNumber="2" sampleTime="[0 0]" uniquePortName="speed" unit="mm/min"/>
+        </SimulinkModelInterface>
+      </Simulink>
+    </Annotation>
+  </Annotations>
+</fmiModelDescription>

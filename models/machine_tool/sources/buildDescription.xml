@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<fmiBuildDescription fmiVersion="3.0">
+  <BuildConfiguration description="Build configuration for desktop platforms" modelIdentifier="machine_tool">
+    <SourceFileSet language="C99">
+      <SourceFile name="machine_tool.c"/>
+      <SourceFile name="machine_tool_data.c"/>
+      <SourceFile name="RTWCG_FMU_util.c"/>
+      <SourceFile name="machine_tool_fmu.c"/>
+    </SourceFileSet>
+  </BuildConfiguration>
+</fmiBuildDescription>
