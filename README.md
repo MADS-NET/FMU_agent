@@ -34,7 +34,13 @@ FMUs are actuallt zipped folders that contain some XML file providing model desc
 
 FMU files are typically exported from simulation software in the **compiled** format, which is only compatible with the working platform. In other words, a FMU file generatd on Intel Windows won't run on a Silicon macOS (and *vice-versa*).
 
-The project `model` directory contains example FMUs in **source format**, so that they can be compiled on the working machine producing a usable `.fmu` file. When you enable the CMake switch `MADS_BUILD_FMU`, the compiled FMUs are created and saved in the `models/fmu` directory.
+The project `model` directory contains example FMUs in **source format**, so that they can be compiled on the working machine producing a usable `.fmu` file. When you enable the CMake switch `MADS_BUILD_FMU`, the FMUs are compiled; upon `cmake --install build` the zipped units are also created and saved in the `models/fmu` directory.
+
+The provided example FMUs are:
+
+- `DoubleMassSpringDamper`: name says it all. No inputs.
+- `linear_axis`: a second-order dynamics linear actuator with a PID controller on position. Inputs: setpoint; outputs: axis position and speed.
+- `machine_tool`: a cartesian manipulator made by a combination of three linear axes.
 
 
 ## Execution
