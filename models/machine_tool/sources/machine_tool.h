@@ -431,9 +431,9 @@ struct P_machine_tool_T_ {
   real_T Constant1_Value;
   real_T Constant1_Value_g;
   real_T Constant1_Value_c;
-  real_T Gain1_Gain;
-  real_T Gain2_Gain;
-  real_T Gain9_Gain;
+  real_T mtomm_Gain;
+  real_T mstommmin_Gain;
+  real_T mmtom_Gain;
   real_T ZeroGain_Gain;
   real_T ZeroGain_Gain_m;
   real_T ZeroGain_Gain_n;

@@ -103,19 +103,19 @@ void machine_tool_output(void)
     }
   }
 
-  machine_tool_Y.position[0] = machine_tool_P.Gain1_Gain *
+  machine_tool_Y.position[0] = machine_tool_P.mtomm_Gain *
     machine_tool_X.position;
-  machine_tool_Y.position[1] = machine_tool_P.Gain1_Gain *
+  machine_tool_Y.position[1] = machine_tool_P.mtomm_Gain *
     machine_tool_X.position_i;
-  machine_tool_Y.position[2] = machine_tool_P.Gain1_Gain *
+  machine_tool_Y.position[2] = machine_tool_P.mtomm_Gain *
     machine_tool_X.position_c;
   machine_tool_B.v = machine_tool_X.speed;
   machine_tool_B.v_p = machine_tool_X.speed_i;
   machine_tool_B.v_k = machine_tool_X.speed_h;
-  machine_tool_Y.speed[0] = machine_tool_P.Gain2_Gain * machine_tool_B.v;
-  machine_tool_Y.speed[1] = machine_tool_P.Gain2_Gain * machine_tool_B.v_p;
-  machine_tool_Y.speed[2] = machine_tool_P.Gain2_Gain * machine_tool_B.v_k;
-  rtb_error = machine_tool_P.Gain9_Gain * machine_tool_U.setpoint[0] -
+  machine_tool_Y.speed[0] = machine_tool_P.mstommmin_Gain * machine_tool_B.v;
+  machine_tool_Y.speed[1] = machine_tool_P.mstommmin_Gain * machine_tool_B.v_p;
+  machine_tool_Y.speed[2] = machine_tool_P.mstommmin_Gain * machine_tool_B.v_k;
+  rtb_error = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[0] -
     rt_roundd_snf(machine_tool_X.position / machine_tool_P.res) *
     machine_tool_P.res;
   machine_tool_B.FilterCoefficient = (machine_tool_P.XD * rtb_error -
@@ -202,7 +202,7 @@ void machine_tool_output(void)
                         -1 ? -machine_tool_P.Xsat : machine_tool_B.Sum) +
                        machine_tool_U.noise[0]) - machine_tool_P.Xdc *
                       machine_tool_B.v) * (1.0 / machine_tool_P.Xm);
-  rtb_error = machine_tool_P.Gain9_Gain * machine_tool_U.setpoint[1] -
+  rtb_error = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[1] -
     rt_roundd_snf(machine_tool_X.position_i / machine_tool_P.res) *
     machine_tool_P.res;
   machine_tool_B.FilterCoefficient_n = (machine_tool_P.YD * rtb_error -
@@ -290,7 +290,7 @@ void machine_tool_output(void)
     -machine_tool_P.Ysat : machine_tool_B.Sum_b) + machine_tool_U.noise[1]) -
                         machine_tool_P.Ydc * machine_tool_B.v_p) * (1.0 /
     machine_tool_P.Ym);
-  rtb_error = machine_tool_P.Gain9_Gain * machine_tool_U.setpoint[2] -
+  rtb_error = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[2] -
     rt_roundd_snf(machine_tool_X.position_c / machine_tool_P.res) *
     machine_tool_P.res;
   machine_tool_B.FilterCoefficient_p = (machine_tool_P.ZD * rtb_error -

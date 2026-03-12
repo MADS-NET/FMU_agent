@@ -30,6 +30,8 @@ else()
   target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts MadsCore)
 endif()
 
+add_executable(simple simple.cpp)
+target_link_libraries(simple PRIVATE MadsCore)
 
 #   ___           _        _ _ 
 #  |_ _|_ __  ___| |_ __ _| | |

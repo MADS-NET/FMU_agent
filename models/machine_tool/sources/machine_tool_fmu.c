@@ -480,7 +480,7 @@ fmi3Instance fmi3InstantiateModelExchange(
             logMessage(instanceEnvironment, fmi3Error, "error","fmi3InstantiateModelExchange: Missing instantiationToken.");
         return NULL;
     }
-    if (strcmp(instantiationToken, "{8afc0b3d-1538-92ff-033a-ac53876b2178}")) {
+    if (strcmp(instantiationToken, "{1f9ada15-74b9-4800-e4b4-a6f96e48f221}")) {
         if (loggingOn && logMessage && instanceEnvironment)
             logMessage(instanceEnvironment, fmi3Error, "error", "fmi3InstantiateModelExchange: Wrong instantiationToken.");
         return NULL;

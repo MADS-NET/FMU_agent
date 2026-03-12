@@ -1,3 +1,4 @@
 *.fmu
 FMI-Standard
 fmu
+binaries/*

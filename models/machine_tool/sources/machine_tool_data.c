@@ -79,7 +79,7 @@ P_machine_tool_T machine_tool_P = {
 
   1000.0,
 
-  3.6,
+  60000.0,
 
   0.001,
 

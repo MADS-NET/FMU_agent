@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<fmiModelDescription fmiVersion="3.0" generationDateAndTime="2026-03-06T14:25:27Z" generationTool="Simulink (R2025b)" instantiationToken="{8afc0b3d-1538-92ff-033a-ac53876b2178}" modelName="machine_tool" variableNamingConvention="structured" version="1.14">
+<fmiModelDescription fmiVersion="3.0" generationDateAndTime="2026-03-12T08:59:34Z" generationTool="Simulink (R2025b)" instantiationToken="{1f9ada15-74b9-4800-e4b4-a6f96e48f221}" modelName="machine_tool" variableNamingConvention="structured" version="1.15">
   <ModelExchange canBeInstantiatedOnlyOncePerProcess="true" canGetAndSetFMUState="true" canSerializeFMUState="true" modelIdentifier="machine_tool" needsExecutionTool="false"/>
   <UnitDefinitions>
     <Unit name="N"/>
