@@ -34,8 +34,11 @@ file(TO_CMAKE_PATH "${MADS_PREFIX_RAW}" MADS_PREFIX)
 include_directories(${MADS_PREFIX}/include)
 link_directories(${MADS_PREFIX}/lib)
 set_property(CACHE CMAKE_INSTALL_PREFIX PROPERTY VALUE ${MADS_PREFIX})
-# No warning on FetchContent_Populate
-cmake_policy(SET CMP0169 OLD)
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
+  # No warning on FetchContent_Populate
+  cmake_policy(SET CMP0169 OLD)
+endif()
 
 option(MADS_INSTALL_AGENT "Install the FMU agent" OFF)
 option(MADS_BUILD_FMU "Build and instal the sample FMUs" OFF)
