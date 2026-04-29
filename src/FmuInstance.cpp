@@ -569,6 +569,12 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
       string var_step;
       if(extract_xml_attribute(cs_tag, "canHandleVariableCommunicationStepSize", var_step)){
         _fixed_step = !(var_step == "true" || var_step == "1");
+
+        std::string step_string;
+        if (extract_xml_attribute(cs_tag, "fixedInternalStepSize", step_string)) {
+          _step_size = std::stod(step_string);
+        }
+
       } else{
         _fixed_step = false;
       }
