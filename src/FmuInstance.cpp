@@ -558,7 +558,6 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
   if(cs){
 
     _type = FmuType::CoSimulation;
-    cout << rang::fg::green << "FMU type: Co-Simulation" << rang::style::reset << endl;
 
     size_t cs_pos = _model_description_xml.find("<CoSimulation");
     if(cs_pos != string::npos){
@@ -587,7 +586,7 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
       fmi3False, // eventModeUsed
       fmi3False, // earlyReturnAllowed
       nullptr,   // requiredIntermediateVariables
-      0,         // nRequiredIntermediateVariables (deve essere 0 se l'array è nullptr)
+      0,         // nRequiredIntermediateVariables (0 if nullptr)
       nullptr,   // instanceEnvironment
       nullptr,   // logMessage
       nullptr    // intermediateUpdate
@@ -596,7 +595,6 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
   } else if(me){
 
     _type = FmuType::ModelExchange;
-    cout << rang::fg::green << "FMU type: Model Exchange" << rang::style::reset << endl;
     _instance = fmi3_instantiateModelExchange(_fmu, false, false, nullptr, nullptr);
 
   } else{
