@@ -164,6 +164,7 @@ int main(int argc, char *const *argv) {
        << endl
        << "  FMU file path:    " << style::bold << fmu_path << style::reset
        << endl
+       << "  FMU type:          " << style::bold << ((plant.get_type() == 1) ? "Model Exchange" : "Co-Simulation") << style::reset << endl
        << "  relative tol:     " << style::bold << relative_tol << style::reset
        << endl
        << "  absolutre tol:    " << style::bold << absolute_tol << style::reset
