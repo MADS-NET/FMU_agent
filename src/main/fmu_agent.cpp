@@ -203,10 +203,16 @@ int main(int argc, char *const *argv) {
       [&]() -> chrono::milliseconds {
         // timing
         now = chrono::steady_clock::now();
-        dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
-                 .count() /
-             1e6;
-        last_timestep = now;
+
+        if(plant.get_fixed_step()){
+          dt = static_cast<double>(period.count()) / 1e3;
+        } else{
+          dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
+                        .count() / 1e6;
+
+          last_timestep = now;
+        }
+        
         t += dt;
         // input
         if (agent.receive(true) == message_type::json &&

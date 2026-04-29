@@ -560,6 +560,20 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
     _type = FmuType::CoSimulation;
     cout << rang::fg::green << "FMU type: Co-Simulation" << rang::style::reset << endl;
 
+    size_t cs_pos = _model_description_xml.find("<CoSimulation");
+    if(cs_pos != string::npos){
+
+      size_t cs_end = _model_description_xml.find(">", cs_pos);
+      string cs_tag = _model_description_xml.substr(cs_pos, cs_end - cs_pos + 1);
+
+      string var_step;
+      if(extract_xml_attribute(cs_tag, "canHandleVariableCommunicationStepSize", var_step)){
+        _fixed_step = !(var_step == "true" || var_step == "1");
+      } else{
+        _fixed_step = false;
+      }
+    }
+
     _instance = fmi3_instantiateCoSimulation(
       _fmu,
       fmi3False, // visible
