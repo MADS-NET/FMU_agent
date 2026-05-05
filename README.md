@@ -13,7 +13,7 @@ Functional Mockup Units (`.fmu` files) can be exported from a large number of si
 As usual for MADS plugins and agents:
 
 ```sh
-cmake -Bbuild
+cmake -Bbuild -DMADS_INSTALL_AGENT=ON -DMADS_BUILD_FMU=ON
 cmake --build build -j6
 ```
 
