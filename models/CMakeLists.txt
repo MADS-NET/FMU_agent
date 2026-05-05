@@ -44,6 +44,9 @@ if(!WIN32)
   add_compile_options(-Wno-switch -Wno-format)
 endif()
 
+if (UNIX)
+  add_compile_options(-Wno-switch -Wno-format)
+endif()
 # Macro to create and install FMU libraries
 macro(add_fmu_library LIB_NAME)
   set(options)

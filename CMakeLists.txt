@@ -77,23 +77,6 @@ FetchContent_Declare(
     EXCLUDE_FROM_ALL
 )
 
-set(BUILD_TESTING OFF CACHE INTERNAL "")
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-FetchContent_Declare(json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG        v3.12.0
-  GIT_SHALLOW    TRUE
-  EXCLUDE_FROM_ALL
-)
-
-
-FetchContent_Declare(rang
-  GIT_REPOSITORY https://github.com/pbosetti/rang.git
-  GIT_TAG        HEAD
-  GIT_SHALLOW    TRUE
-  EXCLUDE_FROM_ALL
-)
-
 # Disabilita le install() della dependency
 set(_old_skip ${CMAKE_SKIP_INSTALL_RULES})
 set(CMAKE_SKIP_INSTALL_RULES ON)
@@ -101,10 +84,6 @@ FetchContent_Populate(cxxopts)
 add_subdirectory(${cxxopts_SOURCE_DIR} ${cxxopts_BINARY_DIR} EXCLUDE_FROM_ALL)
 FetchContent_Populate(fmi4c)
 add_subdirectory(${fmi4c_SOURCE_DIR} ${fmi4c_BINARY_DIR} EXCLUDE_FROM_ALL)
-FetchContent_Populate(json)
-add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
-FetchContent_Populate(rang)
-add_subdirectory(${rang_SOURCE_DIR} ${rang_BINARY_DIR} EXCLUDE_FROM_ALL)
 set(CMAKE_SKIP_INSTALL_RULES ${_old_skip})
 
 #   ____        _ _     _ 
