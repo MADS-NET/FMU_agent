@@ -42,13 +42,13 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
 endif()
 
 option(MADS_INSTALL_AGENT "Install the FMU agent" OFF)
-option(MADS_BUILD_FMU "Build and instal the sample FMUs" OFF)
+option(MADS_BUILD_FMU "Build the sample FMUs and enable the install_fmu target" OFF)
 
 message(STATUS "MADS_PREFIX: ${MADS_PREFIX}")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}") 
 message(STATUS "mads-fmu agent will be installed: ${MADS_INSTALL_AGENT}")
-message(STATUS "Example FMUs will be compiled an installed in models/fmu: ${MADS_BUILD_FMU}")
+message(STATUS "Example FMUs will be compiled and install_fmu will be available: ${MADS_BUILD_FMU}")
 
 #   ____                            _                 _           
 #  |  _ \  ___ _ __   ___ _ __   __| | ___ _ __   ___(_) ___  ___ 

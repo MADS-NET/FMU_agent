@@ -21,7 +21,7 @@ A few notes:
 
 - The default install prefix is the MADS folder (as for `mads -p`)
 - The option `MADS_INSTALL_AGENT` (default: off) enables installation in the prefix directory of the `mads-fmu` agent, so that you can call it as `mads fmu`
-- The option `MADS_BUILD_FMU` (default: off) enables compilation and creation of the FMU units from the source files available in the `models` directory; those are intended for testing purposes
+- The option `MADS_BUILD_FMU` (default: off) enables compilation of the FMU units from the source files available in the `models` directory and adds the `install_fmu` target; those are intended for testing purposes
 
 
 ## FMUs
@@ -34,7 +34,7 @@ FMUs are actuallt zipped folders that contain some XML file providing model desc
 
 FMU files are typically exported from simulation software in the **compiled** format, which is only compatible with the working platform. In other words, a FMU file generatd on Intel Windows won't run on a Silicon macOS (and *vice-versa*).
 
-The project `model` directory contains example FMUs in **source format**, so that they can be compiled on the working machine producing a usable `.fmu` file. When you enable the CMake switch `MADS_BUILD_FMU`, the FMUs are compiled; upon `cmake --install build` the zipped units are also created and saved in the `models/fmu` directory.
+The project `model` directory contains example FMUs in **source format**, so that they can be compiled on the working machine producing a usable `.fmu` file. When you enable the CMake switch `MADS_BUILD_FMU`, the FMUs are compiled; running `cmake --build build --target install_fmu` creates the zipped units and saves them in the `models/fmu` directory.
 
 The provided example FMUs are:
 

@@ -30,6 +30,8 @@ else()
   set(ARCH_PAIR "unknown")
 endif()
 message(STATUS "FMI3 Architecture pair: ${ARCH_PAIR}")
+set(FMU_INSTALL_COMPONENT fmu)
+set(FMU_TARGETS)
 
 # Download FMI3 headers
 set(FMI_PATH ${CMAKE_CURRENT_BINARY_DIR}/FMI-Standard)
@@ -64,13 +66,22 @@ macro(add_fmu_library LIB_NAME)
 
   set(FMU_DESTINATION "${CMAKE_CURRENT_LIST_DIR}/fmu/${LIB_NAME}")
   message(STATUS "FMU destination: ${FMU_DESTINATION}")
+  list(APPEND FMU_TARGETS ${LIB_NAME})
   install(TARGETS ${LIB_NAME}
-    LIBRARY DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
-    RUNTIME DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
+    LIBRARY
+      DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
+      COMPONENT ${FMU_INSTALL_COMPONENT}
+      EXCLUDE_FROM_ALL
+    RUNTIME
+      DESTINATION "${FMU_DESTINATION}/binaries/${ARCH_PAIR}"
+      COMPONENT ${FMU_INSTALL_COMPONENT}
+      EXCLUDE_FROM_ALL
   )
   install(
     FILES ${CMAKE_CURRENT_LIST_DIR}/${LIB_NAME}/modelDescription.xml
     DESTINATION ${FMU_DESTINATION}
+    COMPONENT ${FMU_INSTALL_COMPONENT}
+    EXCLUDE_FROM_ALL
   )
 
   install(CODE "
@@ -85,7 +96,10 @@ macro(add_fmu_library LIB_NAME)
       )
     endif()
     message(STATUS \"Created FMU package: ${FMU_DESTINATION}.fmu\")
-  ")
+  "
+    COMPONENT ${FMU_INSTALL_COMPONENT}
+    EXCLUDE_FROM_ALL
+  )
 endmacro()
 
 
@@ -100,3 +114,12 @@ endmacro()
 add_fmu_library(linear_axis)
 add_fmu_library(DoubleMassSpringDamper)
 add_fmu_library(machine_tool)
+
+add_custom_target(install_fmu
+  COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}"
+          --component ${FMU_INSTALL_COMPONENT}
+          --config "$<CONFIG>"
+  DEPENDS ${FMU_TARGETS}
+  USES_TERMINAL
+  COMMENT "Installing FMUs into ${CMAKE_CURRENT_LIST_DIR}/fmu"
+)
