@@ -65,6 +65,7 @@ int main(int argc, char *const *argv) {
   // Mads-related
   string settings_uri = SETTINGS_URI;
   bool crypto = false;
+  bool trigger_mode = false;
   filesystem::path key_dir(Mads::exec_dir() + "/../etc");
   string client_key_name = "client";
   string server_key_name = "broker";
@@ -87,6 +88,7 @@ int main(int argc, char *const *argv) {
     ("f, fmu", "FMU file to load", value<filesystem::path>())
     ("p,period", "Sampling period (default 100 ms)", value<size_t>())
     ("n,name", "Agent name (default to fmu_<model name>)", value<string>())
+    ("t,trigger", "Enable trigger mode")
     ("i,agent-id", "Agent ID to be added to JSON frames", value<string>())
     ("inspect", "Inspect the FMU and exit");
   // clang-format on
@@ -154,21 +156,33 @@ int main(int argc, char *const *argv) {
   absolute_tol = settings.value("absolute_tol", absolute_tol);
   hmin = settings.value("hmin", hmin);
 
+  trigger_mode = settings.value("trigger_mode", trigger_mode);
+  if (options_parsed.count("trigger") != 0) {
+    trigger_mode = true;
+  }
+
   // Connection
   agent.enable_remote_control();
   agent.connect();
   agent.register_event(event_type::startup);
   agent.info();
-  cout << "  period:           " << style::bold << period.count() << " ms" 
-       << style::reset
-       << endl
-       << "  FMU file path:    " << style::bold << fmu_path << style::reset
+  if (trigger_mode) {
+    period = 0ms; // not used in trigger mode, but set to 0 for clarity in output
+    cout << "  period:           " << style::bold << fg::yellow 
+         << "Trigger mode enabled" << fg::reset
+         << style::reset << endl;
+  } else {
+    cout << "  period:           " << style::bold << period.count() << " ms" 
+         << style::reset << endl;
+  }
+  cout << "  FMU file path:    " << style::bold << fmu_path << style::reset
        << endl
        << "  relative tol:     " << style::bold << relative_tol << style::reset
        << endl
        << "  absolutre tol:    " << style::bold << absolute_tol << style::reset
        << endl
-       << "  hmin:             " << style::bold << hmin << style::reset << endl;
+       << "  hmin:             " << style::bold << hmin << style::reset 
+       << endl;
   plant._solver_params._rel_tol = 1e-5;
   plant._solver_params._abs_tol = 1e-7;
   plant._solver_params._hmin = 1e-12;
@@ -200,59 +214,93 @@ int main(int argc, char *const *argv) {
   double dt = 0, t = 0, t_in = 0, t_msg = 0;
   json status;
   array<string, 3> console_out;
-  agent.loop([&]() -> chrono::milliseconds {
-    // timing
-    now = chrono::steady_clock::now();
-    dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
-              .count() / 1e6;
-    last_timestep = now;
-    t += dt;
-    // input
-    if (agent.receive(true) == message_type::json &&
-        agent.last_topic() != "control") {
-      auto msg = agent.last_message();
-      auto in = json::parse(get<1>(msg));
-      if (in.value("fmu_reset", false)) {
-        plant.reset();
-        t_msg = t;
-        t = 0;
-        console_out[0] = to_string(t_msg) + " s, Reset received";
-        goto integrate;
-      }
-      if (!in["fmu_input"].is_object()) {
-        t_msg = t;
-        console_out[0] = to_string(t_msg) + " s, Missing fmu_input";
-        goto integrate;
-      }
-      t_in = t;
-      console_out[1] = to_string(t_in) + " s, " + in["fmu_input"].dump();
-      for (auto const &[k, v] : in["fmu_input"].items()) {
-        if (v.is_array()) {
-          plant.set_real(k, v.get<std::vector<double>>());
-        } else if (v.is_number()) {
-          plant.set_real(k, v.get<double>());
-        } else {
-          console_out[1] = " (skipped, not a number or array)";
-        }
+
+  // Process a received JSON message: update plant inputs and console_out.
+  // early_exit=true (free-running): returns on reset or missing fmu_input,
+  //   skipping set_real so integration proceeds with unchanged inputs.
+  // early_exit=false (trigger): continues past reset and applies fmu_input.
+  auto process_input = [&](json const &in, bool early_exit = false) {
+    if (in.value("fmu_reset", false)) {
+      plant.reset();
+      t_msg = t;
+      t = 0;
+      console_out[0] = to_string(t_msg) + " s, Reset received";
+      if (early_exit) return;
+    }
+    if (!in["fmu_input"].is_object()) {
+      t_msg = t;
+      console_out[0] = to_string(t_msg) + " s, Missing fmu_input";
+      if (early_exit) return;
+    }
+    t_in = t;
+    console_out[1] = to_string(t_in) + " s, " + in["fmu_input"].dump();
+    for (auto const &[k, v] : in["fmu_input"].items()) {
+      if (v.is_array()) {
+        plant.set_real(k, v.get<std::vector<double>>());
+      } else if (v.is_number()) {
+        plant.set_real(k, v.get<double>());
+      } else {
+        console_out[1] = " (skipped, not a number or array)";
       }
     }
+  };
 
-  integrate:
-    // Integrate
-    plant.do_step(dt);
-    plant.get_status(status);
-    console_out[2] = to_string(t) + " s";
-    auto tet = chrono::steady_clock::now() - now;
-    status["TET"] =
-        chrono::duration_cast<chrono::microseconds>(tet).count();
-    // output
-    agent.publish(status);
-    cout << goback(3) << fg::yellow << "Last message: " << console_out[0]
-          << fg::reset << endl
-          << "Received: " << console_out[1] << endl
-          << "Status update after: " << console_out[2] << endl;
-    return 0ms;
-  }, period);
+  if (trigger_mode) {
+    agent.loop([&]() -> chrono::milliseconds {
+      if (agent.receive(false) == message_type::json && agent.last_topic() != "control") {
+        now = chrono::steady_clock::now();
+        dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
+                .count() / 1e6;
+        last_timestep = now;
+        t += dt;
+        console_out[2] = to_string(t) + " s";
+        plant.do_step(dt);
+        plant.get_status(status);
+        auto tet = chrono::steady_clock::now() - now;
+        status["TET"] =
+          chrono::duration_cast<chrono::microseconds>(tet).count();
+        agent.publish(status);
+        auto msg = agent.last_message();
+        auto in = json::parse(get<1>(msg));
+        process_input(in);
+      }
+      cout << goback(3) << fg::yellow << "Last message: " << console_out[0]
+            << fg::reset << endl
+            << "Received: " << console_out[1] << endl
+            << "Status update after: " << console_out[2] << endl;
+      return 0ms;
+    });
+  } else {
+    agent.loop([&]() -> chrono::milliseconds {
+      // timing
+      now = chrono::steady_clock::now();
+      dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
+                .count() / 1e6;
+      last_timestep = now;
+      t += dt;
+      // input
+      if (agent.receive(true) == message_type::json &&
+          agent.last_topic() != "control") {
+        auto msg = agent.last_message();
+        auto in = json::parse(get<1>(msg));
+        process_input(in, true);
+      }
+      // Integrate
+      plant.do_step(dt);
+      plant.get_status(status);
+      console_out[2] = to_string(t) + " s";
+      auto tet = chrono::steady_clock::now() - now;
+      status["TET"] =
+          chrono::duration_cast<chrono::microseconds>(tet).count();
+      // output
+      agent.publish(status);
+      cout << goback(3) << fg::yellow << "Last message: " << console_out[0]
+            << fg::reset << endl
+            << "Received: " << console_out[1] << endl
+            << "Status update after: " << console_out[2] << endl;
+      return 0ms;
+    }, period);
+  }
   cout << endl << fg::green << "FMU agent stopped" << fg::reset << endl;
   agent.register_event(event_type::shutdown);
   agent.disconnect();

@@ -85,3 +85,37 @@ To reset the model, send the following:
 It is suggested to use the [rerunner plugin](https://github.com/mads-net/rerunner_plugin) to visualize the model state in real time.
 
 > **NOTE:** the model is suppsed to run in real time, i.e. the solution time for each timestep shall be shorter than the timestep itself. Relax the tolerances in the INI section if your model cannot keep up with the real time.
+
+## Triggered mode
+
+By default the agent runs in **free-running** mode: the model is integrated forward at every loop tick regardless of whether a new input message has arrived, and the updated state is published immediately after each integration step. The loop period is fixed by the `period` setting (default: 100 ms).
+
+In **trigger mode** the agent instead blocks waiting for an incoming message on the subscribed topic. Only when a message arrives does the agent:
+
+1. Advance the simulation clock and integrate forward by the elapsed wall-clock time since the last received message.
+2. Publish the resulting state **before** applying the new inputs contained in the message (so the published state reflects the model response to the *previous* input).
+3. Apply the new `fmu_input` values from the received message (ready for the next step).
+
+This makes the simulation step rate slave to the rate of the upstream publisher, which is useful when the FMU is part of a closed-loop pipeline where each controller tick drives one simulation step. The `period` setting is ignored in trigger mode.
+
+Note that a `fmu_reset` message in trigger mode still applies `fmu_input` from the same message (if present), whereas in free-running mode a reset skips input application for that tick.
+
+### Enabling trigger mode
+
+Via the INI settings file:
+
+```toml
+[fmu_<model_name>]
+trigger_mode = true
+```
+
+Or via the command-line option:
+
+```sh
+mads fmu my_model.fmu --trigger
+# or
+mads fmu my_model.fmu -t
+```
+
+The command-line flag always takes precedence over the INI setting.
+
