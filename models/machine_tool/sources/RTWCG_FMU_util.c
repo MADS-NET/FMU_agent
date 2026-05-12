@@ -52,7 +52,7 @@
     static const char* separator = "/";
 #endif
 
-
+#if FMU_CG_TARGET == FMUCG_PROTECTED_MODEL || FMU_CG_TARGET == FMUCG_MCC || FMU_CG_TARGET == FMUCG_GRT
 #ifdef _WIN32
 #include <windows.h>     //GetModuleFileNameW
 #elif __APPLE__          // maca64/maci64
@@ -62,7 +62,6 @@
 #include <unistd.h> //readlink
 #endif
 
-#if FMU_CG_TARGET == FMUCG_PROTECTED_MODEL || FMU_CG_TARGET == FMUCG_MCC || FMU_CG_TARGET == FMUCG_GRT
 const char* raccelDeployLocation(void)
 {
     static char exePath[1024];
@@ -421,6 +420,21 @@ char* uriToLocal(const char *uri) {
 	}
 
 	return path;
+}
+
+void fmu_strncpy(char* dest, void* src, int size) {
+    strncpy(dest, (char*)src, size);
+    dest[size] = '\x00';
+}
+
+char* fmu_strndup(const char* src, int size) {
+    size_t srclen = strlen(src);
+    size_t copylen = srclen < size? srclen : size;
+    char *dest= (char*)malloc(copylen+1);
+    if (dest != NULL) {
+        fmu_strncpy(dest, (void*)src, copylen);
+        }
+    return dest;
 }
 
 /*================================================================*

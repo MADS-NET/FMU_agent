@@ -4,9 +4,6 @@
 #include "multiword_types.h"
 #include "zero_crossing_types.h"
 #include "machine_tool_types.h"
-#include "rtw_continuous.h"
-#include "rtw_solver.h"
-#include "solver_zc.h"
 #ifndef rtmIsMajorTimeStep
 #define rtmIsMajorTimeStep(rtm)        (((rtm)->Timing.simTimeStep) == MAJOR_TIME_STEP)
 #endif
