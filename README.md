@@ -16,7 +16,7 @@ As usual for MADS plugins and agents:
 cmake -Bbuild -DMADS_INSTALL_AGENT=ON -DMADS_BUILD_FMU=ON
 cmake --build build -j6
 sudo cmake --install build # This installs the agent
-make --build build -t install_fmu # This installs the compiled FMUs
+cmake --build build -t install_fmu # This installs the compiled FMUs
 ```
 
 A few notes:
