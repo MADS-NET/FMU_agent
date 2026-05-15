@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<fmiModelDescription fmiVersion="3.0" generationDateAndTime="2026-05-12T12:38:59Z" generationTool="Simulink (R2025b)" instantiationToken="{9dcc63de-1786-4091-8adc-16418cf039e6}" modelName="machine_tool" variableNamingConvention="structured" version="1.22">
+<fmiModelDescription fmiVersion="3.0" generationDateAndTime="2026-05-15T14:36:32Z" generationTool="Simulink (R2025b)" instantiationToken="{3850c198-1e63-e89b-84fe-0049896c2fd3}" modelName="machine_tool" variableNamingConvention="structured" version="1.23">
   <ModelExchange canBeInstantiatedOnlyOncePerProcess="true" canGetAndSetFMUState="true" canSerializeFMUState="true" modelIdentifier="machine_tool" needsExecutionTool="false"/>
   <UnitDefinitions>
     <Unit name="N"/>
@@ -14,7 +14,7 @@
     <Float64 causality="input" description="noise" initial="exact" name="noise" start="0 0 0" unit="N" valueReference="1" variability="continuous">
       <Dimension start="3"/>
     </Float64>
-    <Boolean causality="input" description="reset" initial="exact" name="reset" start="0" valueReference="138" variability="discrete"/>
+    <Boolean causality="input" description="reset" initial="exact" name="reset" start="0" valueReference="117" variability="discrete"/>
     <Float64 causality="output" description="position" initial="calculated" name="position" unit="mm" valueReference="2" variability="continuous">
       <Dimension start="3"/>
     </Float64>
@@ -97,64 +97,43 @@
     <Float64 causality="local" description="EventIndicator37" initial="calculated" name="EventIndicator37" valueReference="77" variability="continuous"/>
     <Float64 causality="local" description="EventIndicator38" initial="calculated" name="EventIndicator38" valueReference="78" variability="continuous"/>
     <Float64 causality="local" description="EventIndicator39" initial="calculated" name="EventIndicator39" valueReference="79" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator40" initial="calculated" name="EventIndicator40" valueReference="80" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator41" initial="calculated" name="EventIndicator41" valueReference="81" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator42" initial="calculated" name="EventIndicator42" valueReference="82" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator43" initial="calculated" name="EventIndicator43" valueReference="83" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator44" initial="calculated" name="EventIndicator44" valueReference="84" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator45" initial="calculated" name="EventIndicator45" valueReference="85" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator46" initial="calculated" name="EventIndicator46" valueReference="86" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator47" initial="calculated" name="EventIndicator47" valueReference="87" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator48" initial="calculated" name="EventIndicator48" valueReference="88" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator49" initial="calculated" name="EventIndicator49" valueReference="89" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator50" initial="calculated" name="EventIndicator50" valueReference="90" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator51" initial="calculated" name="EventIndicator51" valueReference="91" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator52" initial="calculated" name="EventIndicator52" valueReference="92" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator53" initial="calculated" name="EventIndicator53" valueReference="93" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator54" initial="calculated" name="EventIndicator54" valueReference="94" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator55" initial="calculated" name="EventIndicator55" valueReference="95" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator56" initial="calculated" name="EventIndicator56" valueReference="96" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator57" initial="calculated" name="EventIndicator57" valueReference="97" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator58" initial="calculated" name="EventIndicator58" valueReference="98" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator59" initial="calculated" name="EventIndicator59" valueReference="99" variability="continuous"/>
-    <Float64 causality="local" description="EventIndicator60" initial="calculated" name="EventIndicator60" valueReference="100" variability="continuous"/>
-    <Float64 causality="parameter" description="X0" initial="exact" name="X0" start="0" valueReference="101" variability="tunable"/>
-    <Float64 causality="parameter" description="XD_pos" initial="exact" name="XD_pos" start="0" valueReference="102" variability="tunable"/>
-    <Float64 causality="parameter" description="XD_vel" initial="exact" name="XD_vel" start="0" valueReference="103" variability="tunable"/>
-    <Float64 causality="parameter" description="XI_pos" initial="exact" name="XI_pos" start="0" valueReference="104" variability="tunable"/>
-    <Float64 causality="parameter" description="XI_vel" initial="exact" name="XI_vel" start="0.1" valueReference="105" variability="tunable"/>
-    <Float64 causality="parameter" description="XN_pos" initial="exact" name="XN_pos" start="1" valueReference="106" variability="tunable"/>
-    <Float64 causality="parameter" description="XN_vel" initial="exact" name="XN_vel" start="1" valueReference="107" variability="tunable"/>
-    <Float64 causality="parameter" description="XP_pos" initial="exact" name="XP_pos" start="0.3" valueReference="108" variability="tunable"/>
-    <Float64 causality="parameter" description="XP_vel" initial="exact" name="XP_vel" start="0.3" valueReference="109" variability="tunable"/>
-    <Float64 causality="parameter" description="Xdc" initial="exact" name="Xdc" start="0.1" valueReference="110" variability="tunable"/>
-    <Float64 causality="parameter" description="Xm" initial="exact" name="Xm" start="100" valueReference="111" variability="tunable"/>
-    <Float64 causality="parameter" description="Xsat" initial="exact" name="Xsat" start="10000" valueReference="112" variability="tunable"/>
-    <Float64 causality="parameter" description="Y0" initial="exact" name="Y0" start="0" valueReference="113" variability="tunable"/>
-    <Float64 causality="parameter" description="YD_pos" initial="exact" name="YD_pos" start="0" valueReference="114" variability="tunable"/>
-    <Float64 causality="parameter" description="YD_vel" initial="exact" name="YD_vel" start="0" valueReference="115" variability="tunable"/>
-    <Float64 causality="parameter" description="YI_pos" initial="exact" name="YI_pos" start="0" valueReference="116" variability="tunable"/>
-    <Float64 causality="parameter" description="YI_vel" initial="exact" name="YI_vel" start="0.1" valueReference="117" variability="tunable"/>
-    <Float64 causality="parameter" description="YN_pos" initial="exact" name="YN_pos" start="1" valueReference="118" variability="tunable"/>
-    <Float64 causality="parameter" description="YN_vel" initial="exact" name="YN_vel" start="1" valueReference="119" variability="tunable"/>
-    <Float64 causality="parameter" description="YP_pos" initial="exact" name="YP_pos" start="0.3" valueReference="120" variability="tunable"/>
-    <Float64 causality="parameter" description="YP_vel" initial="exact" name="YP_vel" start="0.3" valueReference="121" variability="tunable"/>
-    <Float64 causality="parameter" description="Ydc" initial="exact" name="Ydc" start="0.1" valueReference="122" variability="tunable"/>
-    <Float64 causality="parameter" description="Ym" initial="exact" name="Ym" start="100" valueReference="123" variability="tunable"/>
-    <Float64 causality="parameter" description="Ysat" initial="exact" name="Ysat" start="10000" valueReference="124" variability="tunable"/>
-    <Float64 causality="parameter" description="Z0" initial="exact" name="Z0" start="0" valueReference="125" variability="tunable"/>
-    <Float64 causality="parameter" description="ZD_pos" initial="exact" name="ZD_pos" start="0" valueReference="126" variability="tunable"/>
-    <Float64 causality="parameter" description="ZD_vel" initial="exact" name="ZD_vel" start="0" valueReference="127" variability="tunable"/>
-    <Float64 causality="parameter" description="ZI_pos" initial="exact" name="ZI_pos" start="0" valueReference="128" variability="tunable"/>
-    <Float64 causality="parameter" description="ZI_vel" initial="exact" name="ZI_vel" start="0.1" valueReference="129" variability="tunable"/>
-    <Float64 causality="parameter" description="ZN_pos" initial="exact" name="ZN_pos" start="1" valueReference="130" variability="tunable"/>
-    <Float64 causality="parameter" description="ZN_vel" initial="exact" name="ZN_vel" start="1" valueReference="131" variability="tunable"/>
-    <Float64 causality="parameter" description="ZP_pos" initial="exact" name="ZP_pos" start="0.3" valueReference="132" variability="tunable"/>
-    <Float64 causality="parameter" description="ZP_vel" initial="exact" name="ZP_vel" start="0.3" valueReference="133" variability="tunable"/>
-    <Float64 causality="parameter" description="Zdc" initial="exact" name="Zdc" start="0.1" valueReference="134" variability="tunable"/>
-    <Float64 causality="parameter" description="Zm" initial="exact" name="Zm" start="100" valueReference="135" variability="tunable"/>
-    <Float64 causality="parameter" description="Zsat" initial="exact" name="Zsat" start="10000" valueReference="136" variability="tunable"/>
-    <Float64 causality="parameter" description="res" initial="exact" name="res" start="1e-06" valueReference="137" variability="tunable"/>
+    <Float64 causality="parameter" description="X0" initial="exact" name="X0" start="0" valueReference="80" variability="tunable"/>
+    <Float64 causality="parameter" description="XD_pos" initial="exact" name="XD_pos" start="0" valueReference="81" variability="tunable"/>
+    <Float64 causality="parameter" description="XD_vel" initial="exact" name="XD_vel" start="0" valueReference="82" variability="tunable"/>
+    <Float64 causality="parameter" description="XI_pos" initial="exact" name="XI_pos" start="0" valueReference="83" variability="tunable"/>
+    <Float64 causality="parameter" description="XI_vel" initial="exact" name="XI_vel" start="0.1" valueReference="84" variability="tunable"/>
+    <Float64 causality="parameter" description="XN_pos" initial="exact" name="XN_pos" start="1" valueReference="85" variability="tunable"/>
+    <Float64 causality="parameter" description="XN_vel" initial="exact" name="XN_vel" start="1" valueReference="86" variability="tunable"/>
+    <Float64 causality="parameter" description="XP_pos" initial="exact" name="XP_pos" start="0.3" valueReference="87" variability="tunable"/>
+    <Float64 causality="parameter" description="XP_vel" initial="exact" name="XP_vel" start="0.3" valueReference="88" variability="tunable"/>
+    <Float64 causality="parameter" description="Xdc" initial="exact" name="Xdc" start="0.1" valueReference="89" variability="tunable"/>
+    <Float64 causality="parameter" description="Xm" initial="exact" name="Xm" start="100" valueReference="90" variability="tunable"/>
+    <Float64 causality="parameter" description="Xsat" initial="exact" name="Xsat" start="10000" valueReference="91" variability="tunable"/>
+    <Float64 causality="parameter" description="Y0" initial="exact" name="Y0" start="0" valueReference="92" variability="tunable"/>
+    <Float64 causality="parameter" description="YD_pos" initial="exact" name="YD_pos" start="0" valueReference="93" variability="tunable"/>
+    <Float64 causality="parameter" description="YD_vel" initial="exact" name="YD_vel" start="0" valueReference="94" variability="tunable"/>
+    <Float64 causality="parameter" description="YI_pos" initial="exact" name="YI_pos" start="0" valueReference="95" variability="tunable"/>
+    <Float64 causality="parameter" description="YI_vel" initial="exact" name="YI_vel" start="0.1" valueReference="96" variability="tunable"/>
+    <Float64 causality="parameter" description="YN_pos" initial="exact" name="YN_pos" start="1" valueReference="97" variability="tunable"/>
+    <Float64 causality="parameter" description="YN_vel" initial="exact" name="YN_vel" start="1" valueReference="98" variability="tunable"/>
+    <Float64 causality="parameter" description="YP_pos" initial="exact" name="YP_pos" start="0.3" valueReference="99" variability="tunable"/>
+    <Float64 causality="parameter" description="YP_vel" initial="exact" name="YP_vel" start="0.3" valueReference="100" variability="tunable"/>
+    <Float64 causality="parameter" description="Ydc" initial="exact" name="Ydc" start="0.1" valueReference="101" variability="tunable"/>
+    <Float64 causality="parameter" description="Ym" initial="exact" name="Ym" start="100" valueReference="102" variability="tunable"/>
+    <Float64 causality="parameter" description="Ysat" initial="exact" name="Ysat" start="10000" valueReference="103" variability="tunable"/>
+    <Float64 causality="parameter" description="Z0" initial="exact" name="Z0" start="0" valueReference="104" variability="tunable"/>
+    <Float64 causality="parameter" description="ZD_pos" initial="exact" name="ZD_pos" start="0" valueReference="105" variability="tunable"/>
+    <Float64 causality="parameter" description="ZD_vel" initial="exact" name="ZD_vel" start="0" valueReference="106" variability="tunable"/>
+    <Float64 causality="parameter" description="ZI_pos" initial="exact" name="ZI_pos" start="0" valueReference="107" variability="tunable"/>
+    <Float64 causality="parameter" description="ZI_vel" initial="exact" name="ZI_vel" start="0.1" valueReference="108" variability="tunable"/>
+    <Float64 causality="parameter" description="ZN_pos" initial="exact" name="ZN_pos" start="1" valueReference="109" variability="tunable"/>
+    <Float64 causality="parameter" description="ZN_vel" initial="exact" name="ZN_vel" start="1" valueReference="110" variability="tunable"/>
+    <Float64 causality="parameter" description="ZP_pos" initial="exact" name="ZP_pos" start="0.3" valueReference="111" variability="tunable"/>
+    <Float64 causality="parameter" description="ZP_vel" initial="exact" name="ZP_vel" start="0.3" valueReference="112" variability="tunable"/>
+    <Float64 causality="parameter" description="Zdc" initial="exact" name="Zdc" start="0.1" valueReference="113" variability="tunable"/>
+    <Float64 causality="parameter" description="Zm" initial="exact" name="Zm" start="100" valueReference="114" variability="tunable"/>
+    <Float64 causality="parameter" description="Zsat" initial="exact" name="Zsat" start="10000" valueReference="115" variability="tunable"/>
+    <Float64 causality="parameter" description="res" initial="exact" name="res" start="1e-06" valueReference="116" variability="tunable"/>
   </ModelVariables>
   <ModelStructure>
     <Output valueReference="2"/>
@@ -254,27 +233,6 @@
     <EventIndicator valueReference="77"/>
     <EventIndicator valueReference="78"/>
     <EventIndicator valueReference="79"/>
-    <EventIndicator valueReference="80"/>
-    <EventIndicator valueReference="81"/>
-    <EventIndicator valueReference="82"/>
-    <EventIndicator valueReference="83"/>
-    <EventIndicator valueReference="84"/>
-    <EventIndicator valueReference="85"/>
-    <EventIndicator valueReference="86"/>
-    <EventIndicator valueReference="87"/>
-    <EventIndicator valueReference="88"/>
-    <EventIndicator valueReference="89"/>
-    <EventIndicator valueReference="90"/>
-    <EventIndicator valueReference="91"/>
-    <EventIndicator valueReference="92"/>
-    <EventIndicator valueReference="93"/>
-    <EventIndicator valueReference="94"/>
-    <EventIndicator valueReference="95"/>
-    <EventIndicator valueReference="96"/>
-    <EventIndicator valueReference="97"/>
-    <EventIndicator valueReference="98"/>
-    <EventIndicator valueReference="99"/>
-    <EventIndicator valueReference="100"/>
   </ModelStructure>
   <Annotations>
     <Annotation type="com.mathworks.Simulink">

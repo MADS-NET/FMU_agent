@@ -113,12 +113,6 @@ P_machine_tool_T machine_tool_P = {
 
   0.0,
 
-  0.0,
-
-  0.0,
-
-  0.0,
-
   1000.0,
 
   60000.0,
@@ -130,18 +124,6 @@ P_machine_tool_T machine_tool_P = {
   0.0,
 
   0.0,
-
-  0.0,
-
-  0.0,
-
-  0.0,
-
-  false,
-
-  false,
-
-  false,
 
   false,
 
