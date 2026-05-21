@@ -6,7 +6,7 @@
 #define NUMST 2
 #endif
 #ifndef NCSTATES
-#define NCSTATES 12
+#define NCSTATES 18
 #endif
 #ifndef HAVESTDIO
 #define HAVESTDIO 

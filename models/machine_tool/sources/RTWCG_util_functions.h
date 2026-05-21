@@ -10,6 +10,8 @@
 #endif
 
 #define uriToLocal                                utilFullName(uriToLocal)
+#define fmu_strncpy                               utilFullName(fmu_strncpy)
+#define fmu_strndup                               utilFullName(fmu_strndup)
 #define fmu_nestedDLLLocation                     utilFullName(fmu_nestedDLLLocation)
 #define fmu_nestedResourceLocation                utilFullName(fmu_nestedResourceLocation)
 #define raccelDeployLocation                      utilFullName(raccelDeployLocation)

@@ -27,6 +27,9 @@
 #endif
 #define QUOTE1(name) #name
 #define QUOTE(name) QUOTE1(name)    /* need to expand name    */
+#if defined(__MINGW32__) && defined(__GNUC__) && defined(__cplusplus)
+#define __STDC_FORMAT_MACROS 1
+#endif
 /*==========*
  * Includes *
  *==========*/
@@ -177,7 +180,7 @@ typedef struct {
     DW_machine_tool_T dWork;
     X_machine_tool_T x;
     PrevZCX_machine_tool_T zc;
-    real_T rListBuffer[87];
+    real_T rListBuffer[117];
     boolean_T bListBuffer[1];
     fmi3Float64 time;
     boolean_T isNullInstance;
@@ -192,20 +195,34 @@ void fmu_syncFromBuffer(void) {
 }
  
 void fmu_LogOutput(void) {
-    int i;
+    int i,j,k;
     FMUModelData *modelData = (FMUModelData *)_instance;
     int arrIdsFloat64[] = {2, 3};
+    k = 0;
     for(i=0; i<2; i++){
-        modelData->rOutput[i] = *(modelData->rList[arrIdsFloat64[i]]);
+        if(modelData->rListSize[arrIdsFloat64[i]] > 1) {
+            for(j=0; j<modelData->rListSize[arrIdsFloat64[i]]; j++){
+                modelData->rOutput[k++] = modelData->rList[arrIdsFloat64[i]][j];
+            }
+        } else {
+            modelData->rOutput[k++] = *(modelData->rList[arrIdsFloat64[i]]);
+        }
     }
 }
  
 void fmu_RestoreOutput(void) {
-    int i;
+    int i,j,k;
     FMUModelData *modelData = (FMUModelData *)_instance;
     int arrIdsFloat64[] = {2, 3};
+    k = 0;
     for(i=0; i<2; i++){
-        *(modelData->rList[arrIdsFloat64[i]]) = modelData->rOutput[i];
+        if (modelData->rListSize[arrIdsFloat64[i]] > 1) {
+           for(j=0; j<modelData->rListSize[arrIdsFloat64[i]]; j++){
+              modelData->rList[arrIdsFloat64[i]][j] = modelData->rOutput[k++];
+            }
+        } else{
+           *(modelData->rList[arrIdsFloat64[i]]) = modelData->rOutput[k++];
+        }
     }
 }
  
@@ -391,10 +408,11 @@ static void printLogMsg(fmi3Instance c, const fmi3ValueReference vr[], size_t nv
     _instance = modelData;
     if(!modelData || !modelData->loggingOn || !modelData->logMessage) return;
     DataType datatype = getDataType(funMsg + 3);
-    int ind = 0;
-    for(size_t i = 0; i<nvr; i++){
+    int ind = 0, j;
+    size_t i;
+    for(i = 0; i<nvr; i++){
         size_t idx = vr[i] - startIdx;
-        for (int j = 0; j < *(listSize + idx); j++) {
+        for (j = 0; j < *(listSize + idx); j++) {
              char msgBuffer[255];
              switch (datatype) {
                  case Float64:
@@ -480,7 +498,7 @@ fmi3Instance fmi3InstantiateModelExchange(
             logMessage(instanceEnvironment, fmi3Error, "error","fmi3InstantiateModelExchange: Missing instantiationToken.");
         return NULL;
     }
-    if (strcmp(instantiationToken, "{1f9ada15-74b9-4800-e4b4-a6f96e48f221}")) {
+    if (strcmp(instantiationToken, "{3850c198-1e63-e89b-84fe-0049896c2fd3}")) {
         if (loggingOn && logMessage && instanceEnvironment)
             logMessage(instanceEnvironment, fmi3Error, "error", "fmi3InstantiateModelExchange: Wrong instantiationToken.");
         return NULL;
@@ -549,19 +567,19 @@ fmi3Instance fmi3InstantiateModelExchange(
                 logMessage(instanceEnvironment,fmi3Error, "error", "stop requested in fmi3InstantiateModelExchange");
         return NULL;
     }
-    modelData->rList = (fmi3Float64**)calloc(87, sizeof(fmi3Float64*));
+    modelData->rList = (fmi3Float64**)calloc(117, sizeof(fmi3Float64*));
     if (!modelData->rList) {
          if (loggingOn && logMessage && instanceEnvironment)
                logMessage(instanceEnvironment, fmi3Error, "error","fmi3InstantiateModelExchange: Memory allocation error.");
         return NULL;
     }
-   modelData->rListSize = (int32_T*)calloc(87, sizeof(int32_T));
+   modelData->rListSize = (int32_T*)calloc(117, sizeof(int32_T));
     if (!modelData->rListSize) {
          if (loggingOn && logMessage && instanceEnvironment)
                logMessage(instanceEnvironment, fmi3Error, "error","fmi3InstantiateModelExchange: Memory allocation error.");
         return NULL;
     }
-   modelData->rListDims = (int32_T**)calloc(87, sizeof(int32_T*));
+   modelData->rListDims = (int32_T**)calloc(117, sizeof(int32_T*));
     if (!modelData->rListDims) {
          if (loggingOn && logMessage && instanceEnvironment)
                logMessage(instanceEnvironment, fmi3Error, "error","fmi3InstantiateModelExchange: Memory allocation error.");
@@ -915,6 +933,126 @@ fmi3Instance fmi3InstantiateModelExchange(
     if (!modelData->rListDims[86]) {
         return NULL;
     }
+    modelData->rListDims[87] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[87]) {
+        return NULL;
+    }
+    modelData->rListDims[88] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[88]) {
+        return NULL;
+    }
+    modelData->rListDims[89] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[89]) {
+        return NULL;
+    }
+    modelData->rListDims[90] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[90]) {
+        return NULL;
+    }
+    modelData->rListDims[91] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[91]) {
+        return NULL;
+    }
+    modelData->rListDims[92] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[92]) {
+        return NULL;
+    }
+    modelData->rListDims[93] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[93]) {
+        return NULL;
+    }
+    modelData->rListDims[94] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[94]) {
+        return NULL;
+    }
+    modelData->rListDims[95] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[95]) {
+        return NULL;
+    }
+    modelData->rListDims[96] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[96]) {
+        return NULL;
+    }
+    modelData->rListDims[97] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[97]) {
+        return NULL;
+    }
+    modelData->rListDims[98] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[98]) {
+        return NULL;
+    }
+    modelData->rListDims[99] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[99]) {
+        return NULL;
+    }
+    modelData->rListDims[100] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[100]) {
+        return NULL;
+    }
+    modelData->rListDims[101] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[101]) {
+        return NULL;
+    }
+    modelData->rListDims[102] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[102]) {
+        return NULL;
+    }
+    modelData->rListDims[103] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[103]) {
+        return NULL;
+    }
+    modelData->rListDims[104] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[104]) {
+        return NULL;
+    }
+    modelData->rListDims[105] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[105]) {
+        return NULL;
+    }
+    modelData->rListDims[106] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[106]) {
+        return NULL;
+    }
+    modelData->rListDims[107] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[107]) {
+        return NULL;
+    }
+    modelData->rListDims[108] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[108]) {
+        return NULL;
+    }
+    modelData->rListDims[109] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[109]) {
+        return NULL;
+    }
+    modelData->rListDims[110] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[110]) {
+        return NULL;
+    }
+    modelData->rListDims[111] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[111]) {
+        return NULL;
+    }
+    modelData->rListDims[112] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[112]) {
+        return NULL;
+    }
+    modelData->rListDims[113] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[113]) {
+        return NULL;
+    }
+    modelData->rListDims[114] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[114]) {
+        return NULL;
+    }
+    modelData->rListDims[115] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[115]) {
+        return NULL;
+    }
+    modelData->rListDims[116] = (int32_T*)calloc(1, sizeof(int32_T));
+    if (!modelData->rListDims[116]) {
+        return NULL;
+    }
     modelData->bList = (boolean_T**)calloc(1, sizeof(boolean_T*));
     if (!modelData->bList) {
          if (loggingOn && logMessage && instanceEnvironment)
@@ -937,7 +1075,7 @@ fmi3Instance fmi3InstantiateModelExchange(
     if (!modelData->bListDims[0]) {
         return NULL;
     }
-    modelData->rOutput = (fmi3Float64*)calloc(2, sizeof(fmi3Float64));
+    modelData->rOutput = (fmi3Float64*)calloc(6, sizeof(fmi3Float64));
     if (!modelData->rOutput) {
          if (loggingOn && logMessage && instanceEnvironment)
                logMessage(instanceEnvironment, fmi3Error, "error","fmi3InstantiateModelExchange: Memory allocation error.");
@@ -970,142 +1108,184 @@ fmi3Instance fmi3InstantiateModelExchange(
     modelData->rList[14] = (double*)&(((double*)machine_tool_M->contStates)[9]);
     modelData->rList[15] = (double*)&(((double*)machine_tool_M->contStates)[10]);
     modelData->rList[16] = (double*)&(((double*)machine_tool_M->contStates)[11]);
-    modelData->rList[17] = (double*)&(((double*)machine_tool_M->derivs)[0]);
-    modelData->rList[18] = (double*)&(((double*)machine_tool_M->derivs)[1]);
-    modelData->rList[19] = (double*)&(((double*)machine_tool_M->derivs)[2]);
-    modelData->rList[20] = (double*)&(((double*)machine_tool_M->derivs)[3]);
-    modelData->rList[21] = (double*)&(((double*)machine_tool_M->derivs)[4]);
-    modelData->rList[22] = (double*)&(((double*)machine_tool_M->derivs)[5]);
-    modelData->rList[23] = (double*)&(((double*)machine_tool_M->derivs)[6]);
-    modelData->rList[24] = (double*)&(((double*)machine_tool_M->derivs)[7]);
-    modelData->rList[25] = (double*)&(((double*)machine_tool_M->derivs)[8]);
-    modelData->rList[26] = (double*)&(((double*)machine_tool_M->derivs)[9]);
-    modelData->rList[27] = (double*)&(((double*)machine_tool_M->derivs)[10]);
-    modelData->rList[28] = (double*)&(((double*)machine_tool_M->derivs)[11]);
+    modelData->rList[17] = (double*)&(((double*)machine_tool_M->contStates)[12]);
+    modelData->rList[18] = (double*)&(((double*)machine_tool_M->contStates)[13]);
+    modelData->rList[19] = (double*)&(((double*)machine_tool_M->contStates)[14]);
+    modelData->rList[20] = (double*)&(((double*)machine_tool_M->contStates)[15]);
+    modelData->rList[21] = (double*)&(((double*)machine_tool_M->contStates)[16]);
+    modelData->rList[22] = (double*)&(((double*)machine_tool_M->contStates)[17]);
+    modelData->rList[23] = (double*)&(((double*)machine_tool_M->derivs)[0]);
+    modelData->rList[24] = (double*)&(((double*)machine_tool_M->derivs)[1]);
+    modelData->rList[25] = (double*)&(((double*)machine_tool_M->derivs)[2]);
+    modelData->rList[26] = (double*)&(((double*)machine_tool_M->derivs)[3]);
+    modelData->rList[27] = (double*)&(((double*)machine_tool_M->derivs)[4]);
+    modelData->rList[28] = (double*)&(((double*)machine_tool_M->derivs)[5]);
+    modelData->rList[29] = (double*)&(((double*)machine_tool_M->derivs)[6]);
+    modelData->rList[30] = (double*)&(((double*)machine_tool_M->derivs)[7]);
+    modelData->rList[31] = (double*)&(((double*)machine_tool_M->derivs)[8]);
+    modelData->rList[32] = (double*)&(((double*)machine_tool_M->derivs)[9]);
+    modelData->rList[33] = (double*)&(((double*)machine_tool_M->derivs)[10]);
+    modelData->rList[34] = (double*)&(((double*)machine_tool_M->derivs)[11]);
+    modelData->rList[35] = (double*)&(((double*)machine_tool_M->derivs)[12]);
+    modelData->rList[36] = (double*)&(((double*)machine_tool_M->derivs)[13]);
+    modelData->rList[37] = (double*)&(((double*)machine_tool_M->derivs)[14]);
+    modelData->rList[38] = (double*)&(((double*)machine_tool_M->derivs)[15]);
+    modelData->rList[39] = (double*)&(((double*)machine_tool_M->derivs)[16]);
+    modelData->rList[40] = (double*)&(((double*)machine_tool_M->derivs)[17]);
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[29] = (double*)&(((double*)machine_tool_M->zcSignalVector)[0]);
+    modelData->rList[41] = (double*)&(((double*)machine_tool_M->zcSignalVector)[0]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[30] = (double*)&(((double*)machine_tool_M->zcSignalVector)[1]);
+    modelData->rList[42] = (double*)&(((double*)machine_tool_M->zcSignalVector)[1]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[31] = (double*)&(((double*)machine_tool_M->zcSignalVector)[2]);
+    modelData->rList[43] = (double*)&(((double*)machine_tool_M->zcSignalVector)[2]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[32] = (double*)&(((double*)machine_tool_M->zcSignalVector)[3]);
+    modelData->rList[44] = (double*)&(((double*)machine_tool_M->zcSignalVector)[3]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[33] = (double*)&(((double*)machine_tool_M->zcSignalVector)[4]);
+    modelData->rList[45] = (double*)&(((double*)machine_tool_M->zcSignalVector)[4]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[34] = (double*)&(((double*)machine_tool_M->zcSignalVector)[5]);
+    modelData->rList[46] = (double*)&(((double*)machine_tool_M->zcSignalVector)[5]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[35] = (double*)&(((double*)machine_tool_M->zcSignalVector)[6]);
+    modelData->rList[47] = (double*)&(((double*)machine_tool_M->zcSignalVector)[6]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[36] = (double*)&(((double*)machine_tool_M->zcSignalVector)[7]);
+    modelData->rList[48] = (double*)&(((double*)machine_tool_M->zcSignalVector)[7]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[37] = (double*)&(((double*)machine_tool_M->zcSignalVector)[8]);
+    modelData->rList[49] = (double*)&(((double*)machine_tool_M->zcSignalVector)[8]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[38] = (double*)&(((double*)machine_tool_M->zcSignalVector)[9]);
+    modelData->rList[50] = (double*)&(((double*)machine_tool_M->zcSignalVector)[9]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[39] = (double*)&(((double*)machine_tool_M->zcSignalVector)[10]);
+    modelData->rList[51] = (double*)&(((double*)machine_tool_M->zcSignalVector)[10]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[40] = (double*)&(((double*)machine_tool_M->zcSignalVector)[11]);
+    modelData->rList[52] = (double*)&(((double*)machine_tool_M->zcSignalVector)[11]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[41] = (double*)&(((double*)machine_tool_M->zcSignalVector)[12]);
+    modelData->rList[53] = (double*)&(((double*)machine_tool_M->zcSignalVector)[12]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[42] = (double*)&(((double*)machine_tool_M->zcSignalVector)[13]);
+    modelData->rList[54] = (double*)&(((double*)machine_tool_M->zcSignalVector)[13]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[43] = (double*)&(((double*)machine_tool_M->zcSignalVector)[14]);
+    modelData->rList[55] = (double*)&(((double*)machine_tool_M->zcSignalVector)[14]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[44] = (double*)&(((double*)machine_tool_M->zcSignalVector)[15]);
+    modelData->rList[56] = (double*)&(((double*)machine_tool_M->zcSignalVector)[15]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[45] = (double*)&(((double*)machine_tool_M->zcSignalVector)[16]);
+    modelData->rList[57] = (double*)&(((double*)machine_tool_M->zcSignalVector)[16]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[46] = (double*)&(((double*)machine_tool_M->zcSignalVector)[17]);
+    modelData->rList[58] = (double*)&(((double*)machine_tool_M->zcSignalVector)[17]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[47] = (double*)&(((double*)machine_tool_M->zcSignalVector)[18]);
+    modelData->rList[59] = (double*)&(((double*)machine_tool_M->zcSignalVector)[18]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[48] = (double*)&(((double*)machine_tool_M->zcSignalVector)[19]);
+    modelData->rList[60] = (double*)&(((double*)machine_tool_M->zcSignalVector)[19]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[49] = (double*)&(((double*)machine_tool_M->zcSignalVector)[20]);
+    modelData->rList[61] = (double*)&(((double*)machine_tool_M->zcSignalVector)[20]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[50] = (double*)&(((double*)machine_tool_M->zcSignalVector)[21]);
+    modelData->rList[62] = (double*)&(((double*)machine_tool_M->zcSignalVector)[21]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[51] = (double*)&(((double*)machine_tool_M->zcSignalVector)[22]);
+    modelData->rList[63] = (double*)&(((double*)machine_tool_M->zcSignalVector)[22]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[52] = (double*)&(((double*)machine_tool_M->zcSignalVector)[23]);
+    modelData->rList[64] = (double*)&(((double*)machine_tool_M->zcSignalVector)[23]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[53] = (double*)&(((double*)machine_tool_M->zcSignalVector)[24]);
+    modelData->rList[65] = (double*)&(((double*)machine_tool_M->zcSignalVector)[24]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[54] = (double*)&(((double*)machine_tool_M->zcSignalVector)[25]);
+    modelData->rList[66] = (double*)&(((double*)machine_tool_M->zcSignalVector)[25]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[55] = (double*)&(((double*)machine_tool_M->zcSignalVector)[26]);
+    modelData->rList[67] = (double*)&(((double*)machine_tool_M->zcSignalVector)[26]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[56] = (double*)&(((double*)machine_tool_M->zcSignalVector)[27]);
+    modelData->rList[68] = (double*)&(((double*)machine_tool_M->zcSignalVector)[27]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[57] = (double*)&(((double*)machine_tool_M->zcSignalVector)[28]);
+    modelData->rList[69] = (double*)&(((double*)machine_tool_M->zcSignalVector)[28]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[58] = (double*)&(((double*)machine_tool_M->zcSignalVector)[29]);
+    modelData->rList[70] = (double*)&(((double*)machine_tool_M->zcSignalVector)[29]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[59] = (double*)&(((double*)machine_tool_M->zcSignalVector)[30]);
+    modelData->rList[71] = (double*)&(((double*)machine_tool_M->zcSignalVector)[30]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[60] = (double*)&(((double*)machine_tool_M->zcSignalVector)[31]);
+    modelData->rList[72] = (double*)&(((double*)machine_tool_M->zcSignalVector)[31]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[61] = (double*)&(((double*)machine_tool_M->zcSignalVector)[32]);
+    modelData->rList[73] = (double*)&(((double*)machine_tool_M->zcSignalVector)[32]);
 #endif
-    modelData->rList[62] = (double*)&(machine_tool_P.X0);
-    modelData->rList[63] = (double*)&(machine_tool_P.XD);
-    modelData->rList[64] = (double*)&(machine_tool_P.XI);
-    modelData->rList[65] = (double*)&(machine_tool_P.XN);
-    modelData->rList[66] = (double*)&(machine_tool_P.XP);
-    modelData->rList[67] = (double*)&(machine_tool_P.Xdc);
-    modelData->rList[68] = (double*)&(machine_tool_P.Xm);
-    modelData->rList[69] = (double*)&(machine_tool_P.Xsat);
-    modelData->rList[70] = (double*)&(machine_tool_P.Y0);
-    modelData->rList[71] = (double*)&(machine_tool_P.YD);
-    modelData->rList[72] = (double*)&(machine_tool_P.YI);
-    modelData->rList[73] = (double*)&(machine_tool_P.YN);
-    modelData->rList[74] = (double*)&(machine_tool_P.YP);
-    modelData->rList[75] = (double*)&(machine_tool_P.Ydc);
-    modelData->rList[76] = (double*)&(machine_tool_P.Ym);
-    modelData->rList[77] = (double*)&(machine_tool_P.Ysat);
-    modelData->rList[78] = (double*)&(machine_tool_P.Z0);
-    modelData->rList[79] = (double*)&(machine_tool_P.ZD);
-    modelData->rList[80] = (double*)&(machine_tool_P.ZI);
-    modelData->rList[81] = (double*)&(machine_tool_P.ZN);
-    modelData->rList[82] = (double*)&(machine_tool_P.ZP);
-    modelData->rList[83] = (double*)&(machine_tool_P.Zdc);
-    modelData->rList[84] = (double*)&(machine_tool_P.Zm);
-    modelData->rList[85] = (double*)&(machine_tool_P.Zsat);
-    modelData->rList[86] = (double*)&(machine_tool_P.res);
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[74] = (double*)&(((double*)machine_tool_M->zcSignalVector)[33]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[75] = (double*)&(((double*)machine_tool_M->zcSignalVector)[34]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[76] = (double*)&(((double*)machine_tool_M->zcSignalVector)[35]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[77] = (double*)&(((double*)machine_tool_M->zcSignalVector)[36]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[78] = (double*)&(((double*)machine_tool_M->zcSignalVector)[37]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[79] = (double*)&(((double*)machine_tool_M->zcSignalVector)[38]);
+#endif
+    modelData->rList[80] = (double*)&(machine_tool_P.X0);
+    modelData->rList[81] = (double*)&(machine_tool_P.XD_pos);
+    modelData->rList[82] = (double*)&(machine_tool_P.XD_vel);
+    modelData->rList[83] = (double*)&(machine_tool_P.XI_pos);
+    modelData->rList[84] = (double*)&(machine_tool_P.XI_vel);
+    modelData->rList[85] = (double*)&(machine_tool_P.XN_pos);
+    modelData->rList[86] = (double*)&(machine_tool_P.XN_vel);
+    modelData->rList[87] = (double*)&(machine_tool_P.XP_pos);
+    modelData->rList[88] = (double*)&(machine_tool_P.XP_vel);
+    modelData->rList[89] = (double*)&(machine_tool_P.Xdc);
+    modelData->rList[90] = (double*)&(machine_tool_P.Xm);
+    modelData->rList[91] = (double*)&(machine_tool_P.Xsat);
+    modelData->rList[92] = (double*)&(machine_tool_P.Y0);
+    modelData->rList[93] = (double*)&(machine_tool_P.YD_pos);
+    modelData->rList[94] = (double*)&(machine_tool_P.YD_vel);
+    modelData->rList[95] = (double*)&(machine_tool_P.YI_pos);
+    modelData->rList[96] = (double*)&(machine_tool_P.YI_vel);
+    modelData->rList[97] = (double*)&(machine_tool_P.YN_pos);
+    modelData->rList[98] = (double*)&(machine_tool_P.YN_vel);
+    modelData->rList[99] = (double*)&(machine_tool_P.YP_pos);
+    modelData->rList[100] = (double*)&(machine_tool_P.YP_vel);
+    modelData->rList[101] = (double*)&(machine_tool_P.Ydc);
+    modelData->rList[102] = (double*)&(machine_tool_P.Ym);
+    modelData->rList[103] = (double*)&(machine_tool_P.Ysat);
+    modelData->rList[104] = (double*)&(machine_tool_P.Z0);
+    modelData->rList[105] = (double*)&(machine_tool_P.ZD_pos);
+    modelData->rList[106] = (double*)&(machine_tool_P.ZD_vel);
+    modelData->rList[107] = (double*)&(machine_tool_P.ZI_pos);
+    modelData->rList[108] = (double*)&(machine_tool_P.ZI_vel);
+    modelData->rList[109] = (double*)&(machine_tool_P.ZN_pos);
+    modelData->rList[110] = (double*)&(machine_tool_P.ZN_vel);
+    modelData->rList[111] = (double*)&(machine_tool_P.ZP_pos);
+    modelData->rList[112] = (double*)&(machine_tool_P.ZP_vel);
+    modelData->rList[113] = (double*)&(machine_tool_P.Zdc);
+    modelData->rList[114] = (double*)&(machine_tool_P.Zm);
+    modelData->rList[115] = (double*)&(machine_tool_P.Zsat);
+    modelData->rList[116] = (double*)&(machine_tool_P.res);
     modelData->rListSize[0] = 3;
     modelData->rListSize[1] = 3;
     modelData->rListSize[2] = 3;
@@ -1193,6 +1373,36 @@ fmi3Instance fmi3InstantiateModelExchange(
     modelData->rListSize[84] = 1;
     modelData->rListSize[85] = 1;
     modelData->rListSize[86] = 1;
+    modelData->rListSize[87] = 1;
+    modelData->rListSize[88] = 1;
+    modelData->rListSize[89] = 1;
+    modelData->rListSize[90] = 1;
+    modelData->rListSize[91] = 1;
+    modelData->rListSize[92] = 1;
+    modelData->rListSize[93] = 1;
+    modelData->rListSize[94] = 1;
+    modelData->rListSize[95] = 1;
+    modelData->rListSize[96] = 1;
+    modelData->rListSize[97] = 1;
+    modelData->rListSize[98] = 1;
+    modelData->rListSize[99] = 1;
+    modelData->rListSize[100] = 1;
+    modelData->rListSize[101] = 1;
+    modelData->rListSize[102] = 1;
+    modelData->rListSize[103] = 1;
+    modelData->rListSize[104] = 1;
+    modelData->rListSize[105] = 1;
+    modelData->rListSize[106] = 1;
+    modelData->rListSize[107] = 1;
+    modelData->rListSize[108] = 1;
+    modelData->rListSize[109] = 1;
+    modelData->rListSize[110] = 1;
+    modelData->rListSize[111] = 1;
+    modelData->rListSize[112] = 1;
+    modelData->rListSize[113] = 1;
+    modelData->rListSize[114] = 1;
+    modelData->rListSize[115] = 1;
+    modelData->rListSize[116] = 1;
     modelData->rListDims[0][0]  = 1;
     modelData->rListDims[0][1]  = 3;
     modelData->rListDims[1][0]  = 1;
@@ -1284,6 +1494,36 @@ fmi3Instance fmi3InstantiateModelExchange(
     modelData->rListDims[84][0]  = 1;
     modelData->rListDims[85][0]  = 1;
     modelData->rListDims[86][0]  = 1;
+    modelData->rListDims[87][0]  = 1;
+    modelData->rListDims[88][0]  = 1;
+    modelData->rListDims[89][0]  = 1;
+    modelData->rListDims[90][0]  = 1;
+    modelData->rListDims[91][0]  = 1;
+    modelData->rListDims[92][0]  = 1;
+    modelData->rListDims[93][0]  = 1;
+    modelData->rListDims[94][0]  = 1;
+    modelData->rListDims[95][0]  = 1;
+    modelData->rListDims[96][0]  = 1;
+    modelData->rListDims[97][0]  = 1;
+    modelData->rListDims[98][0]  = 1;
+    modelData->rListDims[99][0]  = 1;
+    modelData->rListDims[100][0]  = 1;
+    modelData->rListDims[101][0]  = 1;
+    modelData->rListDims[102][0]  = 1;
+    modelData->rListDims[103][0]  = 1;
+    modelData->rListDims[104][0]  = 1;
+    modelData->rListDims[105][0]  = 1;
+    modelData->rListDims[106][0]  = 1;
+    modelData->rListDims[107][0]  = 1;
+    modelData->rListDims[108][0]  = 1;
+    modelData->rListDims[109][0]  = 1;
+    modelData->rListDims[110][0]  = 1;
+    modelData->rListDims[111][0]  = 1;
+    modelData->rListDims[112][0]  = 1;
+    modelData->rListDims[113][0]  = 1;
+    modelData->rListDims[114][0]  = 1;
+    modelData->rListDims[115][0]  = 1;
+    modelData->rListDims[116][0]  = 1;
     fmu_syncToBuffer();
     modelData->bList[0] = (boolean_T*)&(machine_tool_U.reset);
     modelData->bListSize[0] = 1;
@@ -1369,7 +1609,7 @@ void fmi3FreeInstance(fmi3Instance c) {
     free((void*)modelData->resourceLocation);
     free((void*)modelData->rList);
     free((void*)modelData->rListSize);
-    for(i=0; i<87; i++)
+    for(i=0; i<117; i++)
        free((void*)modelData->rListDims[i]);
     free((void*)modelData->rListDims);
     free((void*)modelData->bList);
@@ -1497,142 +1737,184 @@ fmi3Status fmi3Reset(fmi3Instance c) {
     modelData->rList[14] = (double*)&(((double*)machine_tool_M->contStates)[9]);
     modelData->rList[15] = (double*)&(((double*)machine_tool_M->contStates)[10]);
     modelData->rList[16] = (double*)&(((double*)machine_tool_M->contStates)[11]);
-    modelData->rList[17] = (double*)&(((double*)machine_tool_M->derivs)[0]);
-    modelData->rList[18] = (double*)&(((double*)machine_tool_M->derivs)[1]);
-    modelData->rList[19] = (double*)&(((double*)machine_tool_M->derivs)[2]);
-    modelData->rList[20] = (double*)&(((double*)machine_tool_M->derivs)[3]);
-    modelData->rList[21] = (double*)&(((double*)machine_tool_M->derivs)[4]);
-    modelData->rList[22] = (double*)&(((double*)machine_tool_M->derivs)[5]);
-    modelData->rList[23] = (double*)&(((double*)machine_tool_M->derivs)[6]);
-    modelData->rList[24] = (double*)&(((double*)machine_tool_M->derivs)[7]);
-    modelData->rList[25] = (double*)&(((double*)machine_tool_M->derivs)[8]);
-    modelData->rList[26] = (double*)&(((double*)machine_tool_M->derivs)[9]);
-    modelData->rList[27] = (double*)&(((double*)machine_tool_M->derivs)[10]);
-    modelData->rList[28] = (double*)&(((double*)machine_tool_M->derivs)[11]);
+    modelData->rList[17] = (double*)&(((double*)machine_tool_M->contStates)[12]);
+    modelData->rList[18] = (double*)&(((double*)machine_tool_M->contStates)[13]);
+    modelData->rList[19] = (double*)&(((double*)machine_tool_M->contStates)[14]);
+    modelData->rList[20] = (double*)&(((double*)machine_tool_M->contStates)[15]);
+    modelData->rList[21] = (double*)&(((double*)machine_tool_M->contStates)[16]);
+    modelData->rList[22] = (double*)&(((double*)machine_tool_M->contStates)[17]);
+    modelData->rList[23] = (double*)&(((double*)machine_tool_M->derivs)[0]);
+    modelData->rList[24] = (double*)&(((double*)machine_tool_M->derivs)[1]);
+    modelData->rList[25] = (double*)&(((double*)machine_tool_M->derivs)[2]);
+    modelData->rList[26] = (double*)&(((double*)machine_tool_M->derivs)[3]);
+    modelData->rList[27] = (double*)&(((double*)machine_tool_M->derivs)[4]);
+    modelData->rList[28] = (double*)&(((double*)machine_tool_M->derivs)[5]);
+    modelData->rList[29] = (double*)&(((double*)machine_tool_M->derivs)[6]);
+    modelData->rList[30] = (double*)&(((double*)machine_tool_M->derivs)[7]);
+    modelData->rList[31] = (double*)&(((double*)machine_tool_M->derivs)[8]);
+    modelData->rList[32] = (double*)&(((double*)machine_tool_M->derivs)[9]);
+    modelData->rList[33] = (double*)&(((double*)machine_tool_M->derivs)[10]);
+    modelData->rList[34] = (double*)&(((double*)machine_tool_M->derivs)[11]);
+    modelData->rList[35] = (double*)&(((double*)machine_tool_M->derivs)[12]);
+    modelData->rList[36] = (double*)&(((double*)machine_tool_M->derivs)[13]);
+    modelData->rList[37] = (double*)&(((double*)machine_tool_M->derivs)[14]);
+    modelData->rList[38] = (double*)&(((double*)machine_tool_M->derivs)[15]);
+    modelData->rList[39] = (double*)&(((double*)machine_tool_M->derivs)[16]);
+    modelData->rList[40] = (double*)&(((double*)machine_tool_M->derivs)[17]);
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[29] = (double*)&(((double*)machine_tool_M->zcSignalVector)[0]);
+    modelData->rList[41] = (double*)&(((double*)machine_tool_M->zcSignalVector)[0]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[30] = (double*)&(((double*)machine_tool_M->zcSignalVector)[1]);
+    modelData->rList[42] = (double*)&(((double*)machine_tool_M->zcSignalVector)[1]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[31] = (double*)&(((double*)machine_tool_M->zcSignalVector)[2]);
+    modelData->rList[43] = (double*)&(((double*)machine_tool_M->zcSignalVector)[2]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[32] = (double*)&(((double*)machine_tool_M->zcSignalVector)[3]);
+    modelData->rList[44] = (double*)&(((double*)machine_tool_M->zcSignalVector)[3]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[33] = (double*)&(((double*)machine_tool_M->zcSignalVector)[4]);
+    modelData->rList[45] = (double*)&(((double*)machine_tool_M->zcSignalVector)[4]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[34] = (double*)&(((double*)machine_tool_M->zcSignalVector)[5]);
+    modelData->rList[46] = (double*)&(((double*)machine_tool_M->zcSignalVector)[5]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[35] = (double*)&(((double*)machine_tool_M->zcSignalVector)[6]);
+    modelData->rList[47] = (double*)&(((double*)machine_tool_M->zcSignalVector)[6]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[36] = (double*)&(((double*)machine_tool_M->zcSignalVector)[7]);
+    modelData->rList[48] = (double*)&(((double*)machine_tool_M->zcSignalVector)[7]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[37] = (double*)&(((double*)machine_tool_M->zcSignalVector)[8]);
+    modelData->rList[49] = (double*)&(((double*)machine_tool_M->zcSignalVector)[8]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[38] = (double*)&(((double*)machine_tool_M->zcSignalVector)[9]);
+    modelData->rList[50] = (double*)&(((double*)machine_tool_M->zcSignalVector)[9]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[39] = (double*)&(((double*)machine_tool_M->zcSignalVector)[10]);
+    modelData->rList[51] = (double*)&(((double*)machine_tool_M->zcSignalVector)[10]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[40] = (double*)&(((double*)machine_tool_M->zcSignalVector)[11]);
+    modelData->rList[52] = (double*)&(((double*)machine_tool_M->zcSignalVector)[11]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[41] = (double*)&(((double*)machine_tool_M->zcSignalVector)[12]);
+    modelData->rList[53] = (double*)&(((double*)machine_tool_M->zcSignalVector)[12]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[42] = (double*)&(((double*)machine_tool_M->zcSignalVector)[13]);
+    modelData->rList[54] = (double*)&(((double*)machine_tool_M->zcSignalVector)[13]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[43] = (double*)&(((double*)machine_tool_M->zcSignalVector)[14]);
+    modelData->rList[55] = (double*)&(((double*)machine_tool_M->zcSignalVector)[14]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[44] = (double*)&(((double*)machine_tool_M->zcSignalVector)[15]);
+    modelData->rList[56] = (double*)&(((double*)machine_tool_M->zcSignalVector)[15]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[45] = (double*)&(((double*)machine_tool_M->zcSignalVector)[16]);
+    modelData->rList[57] = (double*)&(((double*)machine_tool_M->zcSignalVector)[16]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[46] = (double*)&(((double*)machine_tool_M->zcSignalVector)[17]);
+    modelData->rList[58] = (double*)&(((double*)machine_tool_M->zcSignalVector)[17]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[47] = (double*)&(((double*)machine_tool_M->zcSignalVector)[18]);
+    modelData->rList[59] = (double*)&(((double*)machine_tool_M->zcSignalVector)[18]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[48] = (double*)&(((double*)machine_tool_M->zcSignalVector)[19]);
+    modelData->rList[60] = (double*)&(((double*)machine_tool_M->zcSignalVector)[19]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[49] = (double*)&(((double*)machine_tool_M->zcSignalVector)[20]);
+    modelData->rList[61] = (double*)&(((double*)machine_tool_M->zcSignalVector)[20]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[50] = (double*)&(((double*)machine_tool_M->zcSignalVector)[21]);
+    modelData->rList[62] = (double*)&(((double*)machine_tool_M->zcSignalVector)[21]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[51] = (double*)&(((double*)machine_tool_M->zcSignalVector)[22]);
+    modelData->rList[63] = (double*)&(((double*)machine_tool_M->zcSignalVector)[22]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[52] = (double*)&(((double*)machine_tool_M->zcSignalVector)[23]);
+    modelData->rList[64] = (double*)&(((double*)machine_tool_M->zcSignalVector)[23]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[53] = (double*)&(((double*)machine_tool_M->zcSignalVector)[24]);
+    modelData->rList[65] = (double*)&(((double*)machine_tool_M->zcSignalVector)[24]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[54] = (double*)&(((double*)machine_tool_M->zcSignalVector)[25]);
+    modelData->rList[66] = (double*)&(((double*)machine_tool_M->zcSignalVector)[25]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[55] = (double*)&(((double*)machine_tool_M->zcSignalVector)[26]);
+    modelData->rList[67] = (double*)&(((double*)machine_tool_M->zcSignalVector)[26]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[56] = (double*)&(((double*)machine_tool_M->zcSignalVector)[27]);
+    modelData->rList[68] = (double*)&(((double*)machine_tool_M->zcSignalVector)[27]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[57] = (double*)&(((double*)machine_tool_M->zcSignalVector)[28]);
+    modelData->rList[69] = (double*)&(((double*)machine_tool_M->zcSignalVector)[28]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[58] = (double*)&(((double*)machine_tool_M->zcSignalVector)[29]);
+    modelData->rList[70] = (double*)&(((double*)machine_tool_M->zcSignalVector)[29]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[59] = (double*)&(((double*)machine_tool_M->zcSignalVector)[30]);
+    modelData->rList[71] = (double*)&(((double*)machine_tool_M->zcSignalVector)[30]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[60] = (double*)&(((double*)machine_tool_M->zcSignalVector)[31]);
+    modelData->rList[72] = (double*)&(((double*)machine_tool_M->zcSignalVector)[31]);
 #endif
 #ifdef rtmGetSolverZcSignalVector
-    modelData->rList[61] = (double*)&(((double*)machine_tool_M->zcSignalVector)[32]);
+    modelData->rList[73] = (double*)&(((double*)machine_tool_M->zcSignalVector)[32]);
 #endif
-    modelData->rList[62] = (double*)&(machine_tool_P.X0);
-    modelData->rList[63] = (double*)&(machine_tool_P.XD);
-    modelData->rList[64] = (double*)&(machine_tool_P.XI);
-    modelData->rList[65] = (double*)&(machine_tool_P.XN);
-    modelData->rList[66] = (double*)&(machine_tool_P.XP);
-    modelData->rList[67] = (double*)&(machine_tool_P.Xdc);
-    modelData->rList[68] = (double*)&(machine_tool_P.Xm);
-    modelData->rList[69] = (double*)&(machine_tool_P.Xsat);
-    modelData->rList[70] = (double*)&(machine_tool_P.Y0);
-    modelData->rList[71] = (double*)&(machine_tool_P.YD);
-    modelData->rList[72] = (double*)&(machine_tool_P.YI);
-    modelData->rList[73] = (double*)&(machine_tool_P.YN);
-    modelData->rList[74] = (double*)&(machine_tool_P.YP);
-    modelData->rList[75] = (double*)&(machine_tool_P.Ydc);
-    modelData->rList[76] = (double*)&(machine_tool_P.Ym);
-    modelData->rList[77] = (double*)&(machine_tool_P.Ysat);
-    modelData->rList[78] = (double*)&(machine_tool_P.Z0);
-    modelData->rList[79] = (double*)&(machine_tool_P.ZD);
-    modelData->rList[80] = (double*)&(machine_tool_P.ZI);
-    modelData->rList[81] = (double*)&(machine_tool_P.ZN);
-    modelData->rList[82] = (double*)&(machine_tool_P.ZP);
-    modelData->rList[83] = (double*)&(machine_tool_P.Zdc);
-    modelData->rList[84] = (double*)&(machine_tool_P.Zm);
-    modelData->rList[85] = (double*)&(machine_tool_P.Zsat);
-    modelData->rList[86] = (double*)&(machine_tool_P.res);
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[74] = (double*)&(((double*)machine_tool_M->zcSignalVector)[33]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[75] = (double*)&(((double*)machine_tool_M->zcSignalVector)[34]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[76] = (double*)&(((double*)machine_tool_M->zcSignalVector)[35]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[77] = (double*)&(((double*)machine_tool_M->zcSignalVector)[36]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[78] = (double*)&(((double*)machine_tool_M->zcSignalVector)[37]);
+#endif
+#ifdef rtmGetSolverZcSignalVector
+    modelData->rList[79] = (double*)&(((double*)machine_tool_M->zcSignalVector)[38]);
+#endif
+    modelData->rList[80] = (double*)&(machine_tool_P.X0);
+    modelData->rList[81] = (double*)&(machine_tool_P.XD_pos);
+    modelData->rList[82] = (double*)&(machine_tool_P.XD_vel);
+    modelData->rList[83] = (double*)&(machine_tool_P.XI_pos);
+    modelData->rList[84] = (double*)&(machine_tool_P.XI_vel);
+    modelData->rList[85] = (double*)&(machine_tool_P.XN_pos);
+    modelData->rList[86] = (double*)&(machine_tool_P.XN_vel);
+    modelData->rList[87] = (double*)&(machine_tool_P.XP_pos);
+    modelData->rList[88] = (double*)&(machine_tool_P.XP_vel);
+    modelData->rList[89] = (double*)&(machine_tool_P.Xdc);
+    modelData->rList[90] = (double*)&(machine_tool_P.Xm);
+    modelData->rList[91] = (double*)&(machine_tool_P.Xsat);
+    modelData->rList[92] = (double*)&(machine_tool_P.Y0);
+    modelData->rList[93] = (double*)&(machine_tool_P.YD_pos);
+    modelData->rList[94] = (double*)&(machine_tool_P.YD_vel);
+    modelData->rList[95] = (double*)&(machine_tool_P.YI_pos);
+    modelData->rList[96] = (double*)&(machine_tool_P.YI_vel);
+    modelData->rList[97] = (double*)&(machine_tool_P.YN_pos);
+    modelData->rList[98] = (double*)&(machine_tool_P.YN_vel);
+    modelData->rList[99] = (double*)&(machine_tool_P.YP_pos);
+    modelData->rList[100] = (double*)&(machine_tool_P.YP_vel);
+    modelData->rList[101] = (double*)&(machine_tool_P.Ydc);
+    modelData->rList[102] = (double*)&(machine_tool_P.Ym);
+    modelData->rList[103] = (double*)&(machine_tool_P.Ysat);
+    modelData->rList[104] = (double*)&(machine_tool_P.Z0);
+    modelData->rList[105] = (double*)&(machine_tool_P.ZD_pos);
+    modelData->rList[106] = (double*)&(machine_tool_P.ZD_vel);
+    modelData->rList[107] = (double*)&(machine_tool_P.ZI_pos);
+    modelData->rList[108] = (double*)&(machine_tool_P.ZI_vel);
+    modelData->rList[109] = (double*)&(machine_tool_P.ZN_pos);
+    modelData->rList[110] = (double*)&(machine_tool_P.ZN_vel);
+    modelData->rList[111] = (double*)&(machine_tool_P.ZP_pos);
+    modelData->rList[112] = (double*)&(machine_tool_P.ZP_vel);
+    modelData->rList[113] = (double*)&(machine_tool_P.Zdc);
+    modelData->rList[114] = (double*)&(machine_tool_P.Zm);
+    modelData->rList[115] = (double*)&(machine_tool_P.Zsat);
+    modelData->rList[116] = (double*)&(machine_tool_P.res);
     modelData->rListSize[0] = 3;
     modelData->rListSize[1] = 3;
     modelData->rListSize[2] = 3;
@@ -1720,6 +2002,36 @@ fmi3Status fmi3Reset(fmi3Instance c) {
     modelData->rListSize[84] = 1;
     modelData->rListSize[85] = 1;
     modelData->rListSize[86] = 1;
+    modelData->rListSize[87] = 1;
+    modelData->rListSize[88] = 1;
+    modelData->rListSize[89] = 1;
+    modelData->rListSize[90] = 1;
+    modelData->rListSize[91] = 1;
+    modelData->rListSize[92] = 1;
+    modelData->rListSize[93] = 1;
+    modelData->rListSize[94] = 1;
+    modelData->rListSize[95] = 1;
+    modelData->rListSize[96] = 1;
+    modelData->rListSize[97] = 1;
+    modelData->rListSize[98] = 1;
+    modelData->rListSize[99] = 1;
+    modelData->rListSize[100] = 1;
+    modelData->rListSize[101] = 1;
+    modelData->rListSize[102] = 1;
+    modelData->rListSize[103] = 1;
+    modelData->rListSize[104] = 1;
+    modelData->rListSize[105] = 1;
+    modelData->rListSize[106] = 1;
+    modelData->rListSize[107] = 1;
+    modelData->rListSize[108] = 1;
+    modelData->rListSize[109] = 1;
+    modelData->rListSize[110] = 1;
+    modelData->rListSize[111] = 1;
+    modelData->rListSize[112] = 1;
+    modelData->rListSize[113] = 1;
+    modelData->rListSize[114] = 1;
+    modelData->rListSize[115] = 1;
+    modelData->rListSize[116] = 1;
     modelData->rListDims[0][0]  = 1;
     modelData->rListDims[0][1]  = 3;
     modelData->rListDims[1][0]  = 1;
@@ -1811,6 +2123,36 @@ fmi3Status fmi3Reset(fmi3Instance c) {
     modelData->rListDims[84][0]  = 1;
     modelData->rListDims[85][0]  = 1;
     modelData->rListDims[86][0]  = 1;
+    modelData->rListDims[87][0]  = 1;
+    modelData->rListDims[88][0]  = 1;
+    modelData->rListDims[89][0]  = 1;
+    modelData->rListDims[90][0]  = 1;
+    modelData->rListDims[91][0]  = 1;
+    modelData->rListDims[92][0]  = 1;
+    modelData->rListDims[93][0]  = 1;
+    modelData->rListDims[94][0]  = 1;
+    modelData->rListDims[95][0]  = 1;
+    modelData->rListDims[96][0]  = 1;
+    modelData->rListDims[97][0]  = 1;
+    modelData->rListDims[98][0]  = 1;
+    modelData->rListDims[99][0]  = 1;
+    modelData->rListDims[100][0]  = 1;
+    modelData->rListDims[101][0]  = 1;
+    modelData->rListDims[102][0]  = 1;
+    modelData->rListDims[103][0]  = 1;
+    modelData->rListDims[104][0]  = 1;
+    modelData->rListDims[105][0]  = 1;
+    modelData->rListDims[106][0]  = 1;
+    modelData->rListDims[107][0]  = 1;
+    modelData->rListDims[108][0]  = 1;
+    modelData->rListDims[109][0]  = 1;
+    modelData->rListDims[110][0]  = 1;
+    modelData->rListDims[111][0]  = 1;
+    modelData->rListDims[112][0]  = 1;
+    modelData->rListDims[113][0]  = 1;
+    modelData->rListDims[114][0]  = 1;
+    modelData->rListDims[115][0]  = 1;
+    modelData->rListDims[116][0]  = 1;
     fmu_syncToBuffer();
     modelData->bList[0] = (boolean_T*)&(machine_tool_U.reset);
     modelData->bListSize[0] = 1;
@@ -1857,7 +2199,7 @@ fmi3Status fmi3GetFloat64 (fmi3Instance c, const fmi3ValueReference vr[], size_t
         return fmi3Error;
     }
     for (i = 0; i < nvr; i++) {
-        if (vr[i] >= 87 || vr[i] < 0) {
+        if (vr[i] >= 117 || vr[i] < 0) {
             if(modelData->loggingOn && modelData->logMessage)
                 modelData->logMessage(modelData->instanceEnvironment, fmi3Error, "error", "valueReference out of range in fmi3GetFloat64");
             return fmi3Error;
@@ -1895,7 +2237,7 @@ fmi3Status fmi3SetFloat64 (fmi3Instance c, const fmi3ValueReference vr[], size_t
         return fmi3Error;
     }
     for (i = 0; i < nvr; i++) {
-        if (vr[i] >= 87 || vr[i] < 0) {
+        if (vr[i] >= 117 || vr[i] < 0) {
             if(modelData->loggingOn && modelData->logMessage)
                  modelData->logMessage(modelData->instanceEnvironment, fmi3Error, "error", "valueReference out of range in fmi3SetFloat64");
             return fmi3Error;
@@ -2121,7 +2463,7 @@ fmi3Status fmi3GetBoolean (fmi3Instance c, const fmi3ValueReference vr[], size_t
         return fmi3Error;
     }
     for (i = 0; i < nvr; i++) {
-        if (vr[i] >= 88 || vr[i] < 87) {
+        if (vr[i] >= 118 || vr[i] < 117) {
             if(modelData->loggingOn && modelData->logMessage)
                 modelData->logMessage(modelData->instanceEnvironment, fmi3Error, "error", "valueReference out of range in fmi3GetBoolean");
             return fmi3Error;
@@ -2132,7 +2474,7 @@ fmi3Status fmi3GetBoolean (fmi3Instance c, const fmi3ValueReference vr[], size_t
         modelData->isDirty = fmi3False;
     }
     for (i = 0; i < nvr; i++) {
-       size_t idx = vr[i]-87;
+       size_t idx = vr[i]-117;
         updateArrayData(modelData->idxVector, modelData->inDim, modelData->bList[idx],  modelData->bListSize[idx], modelData->bListDims[idx], (void*)(value+counter), true, sizeof(fmi3Boolean), NULL );
         counter += modelData->bListSize[idx];
     }
@@ -2141,7 +2483,7 @@ fmi3Status fmi3GetBoolean (fmi3Instance c, const fmi3ValueReference vr[], size_t
             modelData->logMessage(modelData->instanceEnvironment, fmi3Error, "error", "incorrect num of nv in fmi3GetBoolean");
         return fmi3Error;
     }
-    printLogMsg(c, vr, nvr, "getBoolean", value, 87, modelData->bListSize);
+    printLogMsg(c, vr, nvr, "getBoolean", value, 117, modelData->bListSize);
     return fmi3OK;
 }
 
@@ -2159,18 +2501,18 @@ fmi3Status fmi3SetBoolean (fmi3Instance c, const fmi3ValueReference vr[], size_t
         return fmi3Error;
     }
     for (i = 0; i < nvr; i++) {
-        if (vr[i] >= 88 || vr[i] < 87) {
+        if (vr[i] >= 118 || vr[i] < 117) {
             if(modelData->loggingOn && modelData->logMessage)
                  modelData->logMessage(modelData->instanceEnvironment, fmi3Error, "error", "valueReference out of range in fmi3SetBoolean");
             return fmi3Error;
         }
     }
     for (i = 0; i < nvr; i++) {
-       size_t idx = vr[i]-87;
+       size_t idx = vr[i]-117;
         updateArrayData(modelData->idxVector, modelData->inDim, modelData->bList[idx],  modelData->bListSize[idx], modelData->bListDims[idx], (void*)(value+counter), false, sizeof(fmi3Boolean), &is_diff_value );
         counter += modelData->bListSize[idx];
    }
-    printLogMsg(c, vr, nvr, "setBoolean", value, 87, modelData->bListSize);
+    printLogMsg(c, vr, nvr, "setBoolean", value, 117, modelData->bListSize);
     if (is_diff_value) modelData->isDirty = fmi3True;
     return fmi3OK;
 }
@@ -2246,10 +2588,11 @@ fmi3Status fmi3GetFMUState (fmi3Instance c, fmi3FMUState* FMUState) {
     memcpy(&fmuInternalState->dWork, &machine_tool_DW, sizeof(DW_machine_tool_T));
     memcpy(&fmuInternalState->x, &machine_tool_X, sizeof(X_machine_tool_T));
     memcpy(&fmuInternalState->zc, &machine_tool_PrevZCX, sizeof(PrevZCX_machine_tool_T));
-    for(size_t i = 0; i < 87; i++) {
+    size_t i;
+    for(i = 0; i < 117; i++) {
        fmuInternalState->rListBuffer[i] = *modelData->rList[i];
     }
-    for(size_t i = 0; i < 1; i++) {
+    for(i = 0; i < 1; i++) {
        fmuInternalState->bListBuffer[i] = *modelData->bList[i];
 }
     fmuInternalState->time = modelData->time;
@@ -2272,6 +2615,9 @@ fmi3Status fmi3SetFMUState (fmi3Instance c, fmi3FMUState FMUState) {
         MODEL_INITIALIZE();
         modelData->initialized = fmi3True;
     }
+    if (modelData->loggingOn && modelData->logMessage) {
+        modelData->logMessage(modelData->instanceEnvironment, fmi3Warning, "info", "FMUState contains opaque pointer that might cause unexpected simulation behavior.");
+    }
     memcpy(&machine_tool_U, &fmuInternalState->ExternalInput, sizeof(ExtU_machine_tool_T));
     memcpy(&machine_tool_Y, &fmuInternalState->ExternalOutput, sizeof(ExtY_machine_tool_T));
     memcpy(&machine_tool_P, &fmuInternalState->Parameter, sizeof(P_machine_tool_T));
@@ -2291,10 +2637,11 @@ fmi3Status fmi3SetFMUState (fmi3Instance c, fmi3FMUState FMUState) {
     memcpy(&machine_tool_DW, &fmuInternalState->dWork, sizeof(DW_machine_tool_T));
     memcpy(&machine_tool_X, &fmuInternalState->x, sizeof(X_machine_tool_T));
     memcpy(&machine_tool_PrevZCX, &fmuInternalState->zc, sizeof(PrevZCX_machine_tool_T));
-    for(size_t i = 0; i < 87; i++) {
+   size_t i;
+    for(i = 0; i < 117; i++) {
        *modelData->rList[i] = fmuInternalState->rListBuffer[i];
     }
-    for(size_t i = 0; i < 1; i++) {
+    for(i = 0; i < 1; i++) {
         *modelData->bList[i] = fmuInternalState->bListBuffer[i];
     }
     if (modelData->loggingOn && modelData->logMessage) {
@@ -2310,6 +2657,8 @@ fmi3Status fmi3SetFMUState (fmi3Instance c, fmi3FMUState FMUState) {
 fmi3Status fmi3FreeFMUState(fmi3Instance c, fmi3FMUState* FMUState) {
     (void)c;
     FMUInternalState* fmuInternalState = (FMUInternalState*)*FMUState;
+    FMUModelData *modelData = (FMUModelData *)c;
+    _instance = modelData;
     (void)c;
     free(*FMUState);
     return fmi3OK;
@@ -2416,8 +2765,11 @@ fmi3Status fmi3UpdateDiscreteStates(fmi3Instance c, fmi3Boolean* discreteStatesN
     *valuesOfContinuousStatesChanged = true;
     *nextEventTimeDefined = false;
     *nextEventTime = 0;
+    rtsiSetSimTimeStep(&machine_tool_M->solverInfo, MAJOR_TIME_STEP);
+    rtsiSetSolverStopTime(&machine_tool_M->solverInfo, rtsiGetT(&machine_tool_M->solverInfo));
     rtOneStep(modelData->S);;
     machine_tool_update();
+    rtsiSetSimTimeStep(&machine_tool_M->solverInfo, MINOR_TIME_STEP);
     modelData->isDirty = false;
  
     return fmi3OK;
@@ -2555,19 +2907,19 @@ fmi3Status fmi3EnterContinuousTimeMode(fmi3Instance c) {
 }
 
 fmi3Status fmi3GetContinuousStates(fmi3Instance c, fmi3Float64  x[], size_t nx) {
-    fmi3ValueReference vr[12] = {5,6,7,8,9,10,11,12,13,14,15,16};
+    fmi3ValueReference vr[18] = {5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22};
     (void)c;
-    size_t nvr = 12;
+    size_t nvr = 18;
     return fmi3GetFloat64(c,vr,nvr,x,nx);
 }
 
 fmi3Status fmi3GetContinuousStateDerivatives(fmi3Instance c, fmi3Float64 derivatives[], size_t nx) {
-    fmi3ValueReference vr[12] = {17,18,19,20,21,22,23,24,25,26,27,28};
+    fmi3ValueReference vr[18] = {23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40};
     (void)c;
     FMUModelData *modelData = (FMUModelData *)c;
     _instance = modelData;
     machine_tool_derivatives();
-    size_t nvr = 12;
+    size_t nvr = 18;
     return fmi3GetFloat64(c,vr,nvr,derivatives,nx);
 }
 
@@ -2608,6 +2960,12 @@ fmi3Status fmi3GetEventIndicators(fmi3Instance c, fmi3Float64  eventIndicators[]
     eventIndicators[30] = ((double*)machine_tool_M->zcSignalVector)[30];
     eventIndicators[31] = ((double*)machine_tool_M->zcSignalVector)[31];
     eventIndicators[32] = ((double*)machine_tool_M->zcSignalVector)[32];
+    eventIndicators[33] = ((double*)machine_tool_M->zcSignalVector)[33];
+    eventIndicators[34] = ((double*)machine_tool_M->zcSignalVector)[34];
+    eventIndicators[35] = ((double*)machine_tool_M->zcSignalVector)[35];
+    eventIndicators[36] = ((double*)machine_tool_M->zcSignalVector)[36];
+    eventIndicators[37] = ((double*)machine_tool_M->zcSignalVector)[37];
+    eventIndicators[38] = ((double*)machine_tool_M->zcSignalVector)[38];
 #endif
     return fmi3OK;
 }
@@ -2619,9 +2977,9 @@ fmi3Status fmi3GetNominalsOfContinuousStates(fmi3Instance c, fmi3Float64 x_nomin
 }
 
 fmi3Status fmi3SetContinuousStates(fmi3Instance c, const fmi3Float64 x[], size_t nx) {
-    fmi3ValueReference vr[12] = {5,6,7,8,9,10,11,12,13,14,15,16};
+    fmi3ValueReference vr[18] = {5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22};
     (void)c;
-    size_t nvr = 12;
+    size_t nvr = 18;
     return fmi3SetFloat64(c,vr,nvr,x,nx);
 }
 
@@ -2635,13 +2993,13 @@ fmi3Status fmi3SetTime(fmi3Instance c, fmi3Float64  time) {
 fmi3Status fmi3GetNumberOfEventIndicators(fmi3Instance instance, size_t* nEventIndicators) {
     (void)instance;
 #ifdef rtmGetSolverZcSignalVector
-    *nEventIndicators = 33;
+    *nEventIndicators = 39;
 #endif
     return fmi3OK;
 }
 fmi3Status fmi3GetNumberOfContinuousStates(fmi3Instance instance, size_t* nContinuousStates) {
     (void)instance;
-    *nContinuousStates = 12;
+    *nContinuousStates = 18;
     return fmi3OK;
 }
 /* ---------------------------------------------------------------------------

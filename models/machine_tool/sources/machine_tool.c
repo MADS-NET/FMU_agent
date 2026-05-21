@@ -35,7 +35,7 @@ real_T rt_roundd_snf(real_T u)
 
 void machine_tool_output(void)
 {
-  real_T rtb_error;
+  real_T rtb_Integrator;
   boolean_T didZcEventOccur;
   boolean_T tmp;
   boolean_T tmp_0;
@@ -86,6 +86,14 @@ void machine_tool_output(void)
     }
 
     didZcEventOccur = (machine_tool_U.reset &&
+                       (machine_tool_PrevZCX.Filter_Reset_ZCE != POS_ZCSIG));
+    machine_tool_PrevZCX.Filter_Reset_ZCE = machine_tool_U.reset;
+    if (didZcEventOccur) {
+      machine_tool_X.Filter_CSTATE =
+        machine_tool_P.PIDController_InitialConditionForFilter;
+    }
+
+    didZcEventOccur = (machine_tool_U.reset &&
                        (machine_tool_PrevZCX.Integrator_Reset_ZCE_it !=
                         POS_ZCSIG));
     machine_tool_PrevZCX.Integrator_Reset_ZCE_it = machine_tool_U.reset;
@@ -95,11 +103,19 @@ void machine_tool_output(void)
     }
 
     didZcEventOccur = (machine_tool_U.reset &&
-                       (machine_tool_PrevZCX.Filter_Reset_ZCE != POS_ZCSIG));
-    machine_tool_PrevZCX.Filter_Reset_ZCE = machine_tool_U.reset;
+                       (machine_tool_PrevZCX.Integrator_Reset_ZCE_g != POS_ZCSIG));
+    machine_tool_PrevZCX.Integrator_Reset_ZCE_g = machine_tool_U.reset;
     if (didZcEventOccur) {
-      machine_tool_X.Filter_CSTATE =
-        machine_tool_P.PIDController_InitialConditionForFilter;
+      machine_tool_X.Integrator_CSTATE_g =
+        machine_tool_P.PIDController1_InitialConditionForIntegrator;
+    }
+
+    didZcEventOccur = (machine_tool_U.reset &&
+                       (machine_tool_PrevZCX.Filter_Reset_ZCE_m != POS_ZCSIG));
+    machine_tool_PrevZCX.Filter_Reset_ZCE_m = machine_tool_U.reset;
+    if (didZcEventOccur) {
+      machine_tool_X.Filter_CSTATE_o =
+        machine_tool_P.PIDController1_InitialConditionForFilter;
     }
   }
 
@@ -115,14 +131,21 @@ void machine_tool_output(void)
   machine_tool_Y.speed[0] = machine_tool_P.mstommmin_Gain * machine_tool_B.v;
   machine_tool_Y.speed[1] = machine_tool_P.mstommmin_Gain * machine_tool_B.v_p;
   machine_tool_Y.speed[2] = machine_tool_P.mstommmin_Gain * machine_tool_B.v_k;
-  rtb_error = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[0] -
+  rtb_Integrator = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[0] -
     rt_roundd_snf(machine_tool_X.position / machine_tool_P.res) *
     machine_tool_P.res;
-  machine_tool_B.FilterCoefficient = (machine_tool_P.XD * rtb_error -
-    machine_tool_X.Filter_CSTATE) * machine_tool_P.XN;
-  machine_tool_B.Sum = (machine_tool_P.XP * rtb_error +
-                        machine_tool_X.Integrator_CSTATE) +
-    machine_tool_B.FilterCoefficient;
+  machine_tool_B.IntegralGain = machine_tool_P.XI_pos * rtb_Integrator;
+  machine_tool_B.FilterCoefficient = (machine_tool_P.XD_pos * rtb_Integrator -
+    machine_tool_X.Filter_CSTATE) * machine_tool_P.XN_pos;
+  rtb_Integrator = ((machine_tool_P.XP_pos * rtb_Integrator +
+                     machine_tool_X.Integrator_CSTATE) +
+                    machine_tool_B.FilterCoefficient) - rt_roundd_snf
+    (machine_tool_B.v / machine_tool_P.res) * machine_tool_P.res;
+  machine_tool_B.FilterCoefficient_p = (machine_tool_P.XD_vel * rtb_Integrator -
+    machine_tool_X.Filter_CSTATE_o) * machine_tool_P.XN_vel;
+  machine_tool_B.Sum = (machine_tool_P.XP_vel * rtb_Integrator +
+                        machine_tool_X.Integrator_CSTATE_g) +
+    machine_tool_B.FilterCoefficient_p;
   machine_tool_B.ZeroGain = machine_tool_P.ZeroGain_Gain * machine_tool_B.Sum;
   if (tmp) {
     if (machine_tool_B.Sum > machine_tool_P.Xsat) {
@@ -142,7 +165,7 @@ void machine_tool_output(void)
     machine_tool_B.DeadZone = 0.0;
   }
 
-  machine_tool_B.IntegralGain = machine_tool_P.XI * rtb_error;
+  machine_tool_B.IntegralGain_l = machine_tool_P.XI_vel * rtb_Integrator;
   if (tmp) {
     machine_tool_DW.NotEqual_Mode = (machine_tool_B.ZeroGain !=
       machine_tool_B.DeadZone);
@@ -154,9 +177,9 @@ void machine_tool_output(void)
       machine_tool_DW.SignPreSat_MODE = 0;
     }
 
-    if (machine_tool_B.IntegralGain > 0.0) {
+    if (machine_tool_B.IntegralGain_l > 0.0) {
       machine_tool_DW.SignPreIntegrator_MODE = 1;
-    } else if (machine_tool_B.IntegralGain < 0.0) {
+    } else if (machine_tool_B.IntegralGain_l < 0.0) {
       machine_tool_DW.SignPreIntegrator_MODE = -1;
     } else {
       machine_tool_DW.SignPreIntegrator_MODE = 0;
@@ -174,12 +197,42 @@ void machine_tool_output(void)
   if (machine_tool_B.Memory) {
     machine_tool_B.Switch = machine_tool_P.Constant1_Value;
   } else {
-    machine_tool_B.Switch = machine_tool_B.IntegralGain;
+    machine_tool_B.Switch = machine_tool_B.IntegralGain_l;
   }
 
   if (tmp) {
-    machine_tool_DW.Saturation_MODE = machine_tool_B.Sum >= machine_tool_P.Xsat ?
-      1 : machine_tool_B.Sum > -machine_tool_P.Xsat ? 0 : -1;
+    if (machine_tool_B.Sum >= machine_tool_P.Xsat) {
+      machine_tool_DW.Saturation_MODE = 1;
+    } else if (machine_tool_B.Sum > -machine_tool_P.Xsat) {
+      machine_tool_DW.Saturation_MODE = 0;
+    } else {
+      machine_tool_DW.Saturation_MODE = -1;
+    }
+  }
+
+  if (machine_tool_DW.Saturation_MODE == 1) {
+    rtb_Integrator = machine_tool_P.Xsat;
+  } else if (machine_tool_DW.Saturation_MODE == -1) {
+    rtb_Integrator = -machine_tool_P.Xsat;
+  } else {
+    rtb_Integrator = machine_tool_B.Sum;
+  }
+
+  machine_tool_B.a = ((rtb_Integrator + machine_tool_U.noise[0]) -
+                      machine_tool_P.Xdc * machine_tool_B.v) * (1.0 /
+    machine_tool_P.Xm);
+  rtb_Integrator = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[1] -
+    rt_roundd_snf(machine_tool_X.position_i / machine_tool_P.res) *
+    machine_tool_P.res;
+  if (tmp) {
+    didZcEventOccur = (machine_tool_U.reset &&
+                       (machine_tool_PrevZCX.Filter_Reset_ZCE_l != POS_ZCSIG));
+    machine_tool_PrevZCX.Filter_Reset_ZCE_l = machine_tool_U.reset;
+    if (didZcEventOccur) {
+      machine_tool_X.Filter_CSTATE_p =
+        machine_tool_P.PIDController_InitialConditionForFilter_c;
+    }
+
     didZcEventOccur = (machine_tool_U.reset &&
                        (machine_tool_PrevZCX.Integrator_Reset_ZCE_h != POS_ZCSIG));
     machine_tool_PrevZCX.Integrator_Reset_ZCE_h = machine_tool_U.reset;
@@ -189,84 +242,121 @@ void machine_tool_output(void)
     }
 
     didZcEventOccur = (machine_tool_U.reset &&
-                       (machine_tool_PrevZCX.Filter_Reset_ZCE_l != POS_ZCSIG));
-    machine_tool_PrevZCX.Filter_Reset_ZCE_l = machine_tool_U.reset;
+                       (machine_tool_PrevZCX.Integrator_Reset_ZCE_gd !=
+                        POS_ZCSIG));
+    machine_tool_PrevZCX.Integrator_Reset_ZCE_gd = machine_tool_U.reset;
     if (didZcEventOccur) {
-      machine_tool_X.Filter_CSTATE_p =
-        machine_tool_P.PIDController_InitialConditionForFilter_c;
+      machine_tool_X.Integrator_CSTATE_e =
+        machine_tool_P.PIDController1_InitialConditionForIntegrator_h;
+    }
+
+    didZcEventOccur = (machine_tool_U.reset &&
+                       (machine_tool_PrevZCX.Filter_Reset_ZCE_c != POS_ZCSIG));
+    machine_tool_PrevZCX.Filter_Reset_ZCE_c = machine_tool_U.reset;
+    if (didZcEventOccur) {
+      machine_tool_X.Filter_CSTATE_m =
+        machine_tool_P.PIDController1_InitialConditionForFilter_p;
     }
   }
 
-  machine_tool_B.a = (((machine_tool_DW.Saturation_MODE == 1 ?
-                        machine_tool_P.Xsat : machine_tool_DW.Saturation_MODE ==
-                        -1 ? -machine_tool_P.Xsat : machine_tool_B.Sum) +
-                       machine_tool_U.noise[0]) - machine_tool_P.Xdc *
-                      machine_tool_B.v) * (1.0 / machine_tool_P.Xm);
-  rtb_error = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[1] -
-    rt_roundd_snf(machine_tool_X.position_i / machine_tool_P.res) *
-    machine_tool_P.res;
-  machine_tool_B.FilterCoefficient_n = (machine_tool_P.YD * rtb_error -
-    machine_tool_X.Filter_CSTATE_p) * machine_tool_P.YN;
-  machine_tool_B.Sum_b = (machine_tool_P.YP * rtb_error +
-    machine_tool_X.Integrator_CSTATE_d) + machine_tool_B.FilterCoefficient_n;
-  machine_tool_B.ZeroGain_a = machine_tool_P.ZeroGain_Gain_m *
-    machine_tool_B.Sum_b;
+  machine_tool_B.IntegralGain_n = machine_tool_P.YI_pos * rtb_Integrator;
+  machine_tool_B.FilterCoefficient_n = (machine_tool_P.YD_pos * rtb_Integrator -
+    machine_tool_X.Filter_CSTATE_p) * machine_tool_P.YN_pos;
+  rtb_Integrator = ((machine_tool_P.YP_pos * rtb_Integrator +
+                     machine_tool_X.Integrator_CSTATE_d) +
+                    machine_tool_B.FilterCoefficient_n) - rt_roundd_snf
+    (machine_tool_B.v_p / machine_tool_P.res) * machine_tool_P.res;
+  machine_tool_B.FilterCoefficient_d = (machine_tool_P.YD_vel * rtb_Integrator -
+    machine_tool_X.Filter_CSTATE_m) * machine_tool_P.YN_vel;
+  machine_tool_B.Sum_n = (machine_tool_P.YP_vel * rtb_Integrator +
+    machine_tool_X.Integrator_CSTATE_e) + machine_tool_B.FilterCoefficient_d;
+  machine_tool_B.ZeroGain_n = machine_tool_P.ZeroGain_Gain_i *
+    machine_tool_B.Sum_n;
   if (tmp) {
-    if (machine_tool_B.Sum_b > machine_tool_P.Ysat) {
-      machine_tool_DW.DeadZone_MODE_o = 1;
-    } else if (machine_tool_B.Sum_b >= -machine_tool_P.Ysat) {
-      machine_tool_DW.DeadZone_MODE_o = 0;
+    if (machine_tool_B.Sum_n > machine_tool_P.Ysat) {
+      machine_tool_DW.DeadZone_MODE_b = 1;
+    } else if (machine_tool_B.Sum_n >= -machine_tool_P.Ysat) {
+      machine_tool_DW.DeadZone_MODE_b = 0;
     } else {
-      machine_tool_DW.DeadZone_MODE_o = -1;
+      machine_tool_DW.DeadZone_MODE_b = -1;
     }
   }
 
-  if (machine_tool_DW.DeadZone_MODE_o == 1) {
-    machine_tool_B.DeadZone_n = machine_tool_B.Sum_b - machine_tool_P.Ysat;
-  } else if (machine_tool_DW.DeadZone_MODE_o == -1) {
-    machine_tool_B.DeadZone_n = machine_tool_B.Sum_b - (-machine_tool_P.Ysat);
+  if (machine_tool_DW.DeadZone_MODE_b == 1) {
+    machine_tool_B.DeadZone_i = machine_tool_B.Sum_n - machine_tool_P.Ysat;
+  } else if (machine_tool_DW.DeadZone_MODE_b == -1) {
+    machine_tool_B.DeadZone_i = machine_tool_B.Sum_n - (-machine_tool_P.Ysat);
   } else {
-    machine_tool_B.DeadZone_n = 0.0;
+    machine_tool_B.DeadZone_i = 0.0;
   }
 
-  machine_tool_B.IntegralGain_n = machine_tool_P.YI * rtb_error;
+  machine_tool_B.IntegralGain_c = machine_tool_P.YI_vel * rtb_Integrator;
   if (tmp) {
-    machine_tool_DW.NotEqual_Mode_c = (machine_tool_B.ZeroGain_a !=
-      machine_tool_B.DeadZone_n);
-    if (machine_tool_B.DeadZone_n > 0.0) {
-      machine_tool_DW.SignPreSat_MODE_n = 1;
-    } else if (machine_tool_B.DeadZone_n < 0.0) {
-      machine_tool_DW.SignPreSat_MODE_n = -1;
+    machine_tool_DW.NotEqual_Mode_g = (machine_tool_B.ZeroGain_n !=
+      machine_tool_B.DeadZone_i);
+    if (machine_tool_B.DeadZone_i > 0.0) {
+      machine_tool_DW.SignPreSat_MODE_b = 1;
+    } else if (machine_tool_B.DeadZone_i < 0.0) {
+      machine_tool_DW.SignPreSat_MODE_b = -1;
     } else {
-      machine_tool_DW.SignPreSat_MODE_n = 0;
+      machine_tool_DW.SignPreSat_MODE_b = 0;
     }
 
-    if (machine_tool_B.IntegralGain_n > 0.0) {
-      machine_tool_DW.SignPreIntegrator_MODE_h = 1;
-    } else if (machine_tool_B.IntegralGain_n < 0.0) {
-      machine_tool_DW.SignPreIntegrator_MODE_h = -1;
+    if (machine_tool_B.IntegralGain_c > 0.0) {
+      machine_tool_DW.SignPreIntegrator_MODE_g = 1;
+    } else if (machine_tool_B.IntegralGain_c < 0.0) {
+      machine_tool_DW.SignPreIntegrator_MODE_g = -1;
     } else {
-      machine_tool_DW.SignPreIntegrator_MODE_h = 0;
+      machine_tool_DW.SignPreIntegrator_MODE_g = 0;
     }
   }
 
-  machine_tool_B.AND3_b = (machine_tool_DW.NotEqual_Mode_c && ((int8_T)
-    machine_tool_DW.SignPreSat_MODE_n == (int8_T)
-    machine_tool_DW.SignPreIntegrator_MODE_h));
+  machine_tool_B.AND3_o = (machine_tool_DW.NotEqual_Mode_g && ((int8_T)
+    machine_tool_DW.SignPreSat_MODE_b == (int8_T)
+    machine_tool_DW.SignPreIntegrator_MODE_g));
   if (tmp_0) {
-    machine_tool_B.Memory_a = machine_tool_DW.Memory_PreviousInput_j;
+    machine_tool_B.Memory_p = machine_tool_DW.Memory_PreviousInput_e;
   }
 
-  if (machine_tool_B.Memory_a) {
-    machine_tool_B.Switch_i = machine_tool_P.Constant1_Value_g;
+  if (machine_tool_B.Memory_p) {
+    machine_tool_B.Switch_g = machine_tool_P.Constant1_Value_a;
   } else {
-    machine_tool_B.Switch_i = machine_tool_B.IntegralGain_n;
+    machine_tool_B.Switch_g = machine_tool_B.IntegralGain_c;
   }
 
   if (tmp) {
-    machine_tool_DW.Saturation_MODE_a = machine_tool_B.Sum_b >=
-      machine_tool_P.Ysat ? 1 : machine_tool_B.Sum_b > -machine_tool_P.Ysat ? 0 :
-      -1;
+    if (machine_tool_B.Sum_n >= machine_tool_P.Ysat) {
+      machine_tool_DW.Saturation_MODE_p = 1;
+    } else if (machine_tool_B.Sum_n > -machine_tool_P.Ysat) {
+      machine_tool_DW.Saturation_MODE_p = 0;
+    } else {
+      machine_tool_DW.Saturation_MODE_p = -1;
+    }
+  }
+
+  if (machine_tool_DW.Saturation_MODE_p == 1) {
+    rtb_Integrator = machine_tool_P.Ysat;
+  } else if (machine_tool_DW.Saturation_MODE_p == -1) {
+    rtb_Integrator = -machine_tool_P.Ysat;
+  } else {
+    rtb_Integrator = machine_tool_B.Sum_n;
+  }
+
+  machine_tool_B.a_a = ((rtb_Integrator + machine_tool_U.noise[1]) -
+                        machine_tool_P.Ydc * machine_tool_B.v_p) * (1.0 /
+    machine_tool_P.Ym);
+  rtb_Integrator = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[2] -
+    rt_roundd_snf(machine_tool_X.position_c / machine_tool_P.res) *
+    machine_tool_P.res;
+  if (tmp) {
+    didZcEventOccur = (machine_tool_U.reset &&
+                       (machine_tool_PrevZCX.Filter_Reset_ZCE_j != POS_ZCSIG));
+    machine_tool_PrevZCX.Filter_Reset_ZCE_j = machine_tool_U.reset;
+    if (didZcEventOccur) {
+      machine_tool_X.Filter_CSTATE_oe =
+        machine_tool_P.PIDController_InitialConditionForFilter_n;
+    }
+
     didZcEventOccur = (machine_tool_U.reset &&
                        (machine_tool_PrevZCX.Integrator_Reset_ZCE_ic !=
                         POS_ZCSIG));
@@ -277,89 +367,106 @@ void machine_tool_output(void)
     }
 
     didZcEventOccur = (machine_tool_U.reset &&
-                       (machine_tool_PrevZCX.Filter_Reset_ZCE_j != POS_ZCSIG));
-    machine_tool_PrevZCX.Filter_Reset_ZCE_j = machine_tool_U.reset;
+                       (machine_tool_PrevZCX.Integrator_Reset_ZCE_k != POS_ZCSIG));
+    machine_tool_PrevZCX.Integrator_Reset_ZCE_k = machine_tool_U.reset;
     if (didZcEventOccur) {
-      machine_tool_X.Filter_CSTATE_o =
-        machine_tool_P.PIDController_InitialConditionForFilter_n;
+      machine_tool_X.Integrator_CSTATE_m =
+        machine_tool_P.PIDController1_InitialConditionForIntegrator_m;
+    }
+
+    didZcEventOccur = (machine_tool_U.reset &&
+                       (machine_tool_PrevZCX.Filter_Reset_ZCE_g != POS_ZCSIG));
+    machine_tool_PrevZCX.Filter_Reset_ZCE_g = machine_tool_U.reset;
+    if (didZcEventOccur) {
+      machine_tool_X.Filter_CSTATE_e =
+        machine_tool_P.PIDController1_InitialConditionForFilter_l;
     }
   }
 
-  machine_tool_B.a_a = (((machine_tool_DW.Saturation_MODE_a == 1 ?
-    machine_tool_P.Ysat : machine_tool_DW.Saturation_MODE_a == -1 ?
-    -machine_tool_P.Ysat : machine_tool_B.Sum_b) + machine_tool_U.noise[1]) -
-                        machine_tool_P.Ydc * machine_tool_B.v_p) * (1.0 /
-    machine_tool_P.Ym);
-  rtb_error = machine_tool_P.mmtom_Gain * machine_tool_U.setpoint[2] -
-    rt_roundd_snf(machine_tool_X.position_c / machine_tool_P.res) *
-    machine_tool_P.res;
-  machine_tool_B.FilterCoefficient_p = (machine_tool_P.ZD * rtb_error -
-    machine_tool_X.Filter_CSTATE_o) * machine_tool_P.ZN;
-  machine_tool_B.Sum_d = (machine_tool_P.ZP * rtb_error +
-    machine_tool_X.Integrator_CSTATE_i) + machine_tool_B.FilterCoefficient_p;
-  machine_tool_B.ZeroGain_o = machine_tool_P.ZeroGain_Gain_n *
-    machine_tool_B.Sum_d;
+  machine_tool_B.IntegralGain_m = machine_tool_P.ZI_pos * rtb_Integrator;
+  machine_tool_B.FilterCoefficient_py = (machine_tool_P.ZD_pos * rtb_Integrator
+    - machine_tool_X.Filter_CSTATE_oe) * machine_tool_P.ZN_pos;
+  rtb_Integrator = ((machine_tool_P.ZP_pos * rtb_Integrator +
+                     machine_tool_X.Integrator_CSTATE_i) +
+                    machine_tool_B.FilterCoefficient_py) - rt_roundd_snf
+    (machine_tool_B.v_k / machine_tool_P.res) * machine_tool_P.res;
+  machine_tool_B.FilterCoefficient_g = (machine_tool_P.ZD_vel * rtb_Integrator -
+    machine_tool_X.Filter_CSTATE_e) * machine_tool_P.ZN_vel;
+  machine_tool_B.Sum_l = (machine_tool_P.ZP_vel * rtb_Integrator +
+    machine_tool_X.Integrator_CSTATE_m) + machine_tool_B.FilterCoefficient_g;
+  machine_tool_B.ZeroGain_i = machine_tool_P.ZeroGain_Gain_d *
+    machine_tool_B.Sum_l;
   if (tmp) {
-    if (machine_tool_B.Sum_d > machine_tool_P.Zsat) {
-      machine_tool_DW.DeadZone_MODE_a = 1;
-    } else if (machine_tool_B.Sum_d >= -machine_tool_P.Zsat) {
-      machine_tool_DW.DeadZone_MODE_a = 0;
+    if (machine_tool_B.Sum_l > machine_tool_P.Zsat) {
+      machine_tool_DW.DeadZone_MODE_i = 1;
+    } else if (machine_tool_B.Sum_l >= -machine_tool_P.Zsat) {
+      machine_tool_DW.DeadZone_MODE_i = 0;
     } else {
-      machine_tool_DW.DeadZone_MODE_a = -1;
+      machine_tool_DW.DeadZone_MODE_i = -1;
     }
   }
 
-  if (machine_tool_DW.DeadZone_MODE_a == 1) {
-    machine_tool_B.DeadZone_g = machine_tool_B.Sum_d - machine_tool_P.Zsat;
-  } else if (machine_tool_DW.DeadZone_MODE_a == -1) {
-    machine_tool_B.DeadZone_g = machine_tool_B.Sum_d - (-machine_tool_P.Zsat);
+  if (machine_tool_DW.DeadZone_MODE_i == 1) {
+    machine_tool_B.DeadZone_g = machine_tool_B.Sum_l - machine_tool_P.Zsat;
+  } else if (machine_tool_DW.DeadZone_MODE_i == -1) {
+    machine_tool_B.DeadZone_g = machine_tool_B.Sum_l - (-machine_tool_P.Zsat);
   } else {
     machine_tool_B.DeadZone_g = 0.0;
   }
 
-  machine_tool_B.IntegralGain_m = machine_tool_P.ZI * rtb_error;
+  machine_tool_B.IntegralGain_k = machine_tool_P.ZI_vel * rtb_Integrator;
   if (tmp) {
-    machine_tool_DW.NotEqual_Mode_p = (machine_tool_B.ZeroGain_o !=
+    machine_tool_DW.NotEqual_Mode_p = (machine_tool_B.ZeroGain_i !=
       machine_tool_B.DeadZone_g);
     if (machine_tool_B.DeadZone_g > 0.0) {
-      machine_tool_DW.SignPreSat_MODE_a = 1;
+      machine_tool_DW.SignPreSat_MODE_h = 1;
     } else if (machine_tool_B.DeadZone_g < 0.0) {
-      machine_tool_DW.SignPreSat_MODE_a = -1;
+      machine_tool_DW.SignPreSat_MODE_h = -1;
     } else {
-      machine_tool_DW.SignPreSat_MODE_a = 0;
+      machine_tool_DW.SignPreSat_MODE_h = 0;
     }
 
-    if (machine_tool_B.IntegralGain_m > 0.0) {
-      machine_tool_DW.SignPreIntegrator_MODE_hi = 1;
-    } else if (machine_tool_B.IntegralGain_m < 0.0) {
-      machine_tool_DW.SignPreIntegrator_MODE_hi = -1;
+    if (machine_tool_B.IntegralGain_k > 0.0) {
+      machine_tool_DW.SignPreIntegrator_MODE_m = 1;
+    } else if (machine_tool_B.IntegralGain_k < 0.0) {
+      machine_tool_DW.SignPreIntegrator_MODE_m = -1;
     } else {
-      machine_tool_DW.SignPreIntegrator_MODE_hi = 0;
+      machine_tool_DW.SignPreIntegrator_MODE_m = 0;
     }
   }
 
-  machine_tool_B.AND3_d = (machine_tool_DW.NotEqual_Mode_p && ((int8_T)
-    machine_tool_DW.SignPreSat_MODE_a == (int8_T)
-    machine_tool_DW.SignPreIntegrator_MODE_hi));
+  machine_tool_B.AND3_c = (machine_tool_DW.NotEqual_Mode_p && ((int8_T)
+    machine_tool_DW.SignPreSat_MODE_h == (int8_T)
+    machine_tool_DW.SignPreIntegrator_MODE_m));
   if (tmp_0) {
-    machine_tool_B.Memory_f = machine_tool_DW.Memory_PreviousInput_a;
+    machine_tool_B.Memory_n = machine_tool_DW.Memory_PreviousInput_n;
   }
 
-  if (machine_tool_B.Memory_f) {
-    machine_tool_B.Switch_g = machine_tool_P.Constant1_Value_c;
+  if (machine_tool_B.Memory_n) {
+    machine_tool_B.Switch_p = machine_tool_P.Constant1_Value_f;
   } else {
-    machine_tool_B.Switch_g = machine_tool_B.IntegralGain_m;
+    machine_tool_B.Switch_p = machine_tool_B.IntegralGain_k;
   }
 
   if (tmp) {
-    machine_tool_DW.Saturation_MODE_d = machine_tool_B.Sum_d >=
-      machine_tool_P.Zsat ? 1 : machine_tool_B.Sum_d > -machine_tool_P.Zsat ? 0 :
-      -1;
+    if (machine_tool_B.Sum_l >= machine_tool_P.Zsat) {
+      machine_tool_DW.Saturation_MODE_k = 1;
+    } else if (machine_tool_B.Sum_l > -machine_tool_P.Zsat) {
+      machine_tool_DW.Saturation_MODE_k = 0;
+    } else {
+      machine_tool_DW.Saturation_MODE_k = -1;
+    }
   }
 
-  machine_tool_B.a_j = (((machine_tool_DW.Saturation_MODE_d == 1 ?
-    machine_tool_P.Zsat : machine_tool_DW.Saturation_MODE_d == -1 ?
-    -machine_tool_P.Zsat : machine_tool_B.Sum_d) + machine_tool_U.noise[2]) -
+  if (machine_tool_DW.Saturation_MODE_k == 1) {
+    rtb_Integrator = machine_tool_P.Zsat;
+  } else if (machine_tool_DW.Saturation_MODE_k == -1) {
+    rtb_Integrator = -machine_tool_P.Zsat;
+  } else {
+    rtb_Integrator = machine_tool_B.Sum_l;
+  }
+
+  machine_tool_B.a_j = ((rtb_Integrator + machine_tool_U.noise[2]) -
                         machine_tool_P.Zdc * machine_tool_B.v_k) * (1.0 /
     machine_tool_P.Zm);
 }
@@ -368,8 +475,8 @@ void machine_tool_update(void)
 {
   if (rtmIsMajorTimeStep(machine_tool_M)) {
     machine_tool_DW.Memory_PreviousInput = machine_tool_B.AND3;
-    machine_tool_DW.Memory_PreviousInput_j = machine_tool_B.AND3_b;
-    machine_tool_DW.Memory_PreviousInput_a = machine_tool_B.AND3_d;
+    machine_tool_DW.Memory_PreviousInput_e = machine_tool_B.AND3_o;
+    machine_tool_DW.Memory_PreviousInput_n = machine_tool_B.AND3_c;
   }
 
   if (rtmIsMajorTimeStep(machine_tool_M)) {
@@ -399,12 +506,18 @@ void machine_tool_derivatives(void)
   _rtXdot->speed = machine_tool_B.a;
   _rtXdot->speed_i = machine_tool_B.a_a;
   _rtXdot->speed_h = machine_tool_B.a_j;
-  _rtXdot->Integrator_CSTATE = machine_tool_B.Switch;
   _rtXdot->Filter_CSTATE = machine_tool_B.FilterCoefficient;
-  _rtXdot->Integrator_CSTATE_d = machine_tool_B.Switch_i;
-  _rtXdot->Filter_CSTATE_p = machine_tool_B.FilterCoefficient_n;
-  _rtXdot->Integrator_CSTATE_i = machine_tool_B.Switch_g;
+  _rtXdot->Integrator_CSTATE = machine_tool_B.IntegralGain;
+  _rtXdot->Integrator_CSTATE_g = machine_tool_B.Switch;
   _rtXdot->Filter_CSTATE_o = machine_tool_B.FilterCoefficient_p;
+  _rtXdot->Filter_CSTATE_p = machine_tool_B.FilterCoefficient_n;
+  _rtXdot->Integrator_CSTATE_d = machine_tool_B.IntegralGain_n;
+  _rtXdot->Integrator_CSTATE_e = machine_tool_B.Switch_g;
+  _rtXdot->Filter_CSTATE_m = machine_tool_B.FilterCoefficient_d;
+  _rtXdot->Filter_CSTATE_oe = machine_tool_B.FilterCoefficient_py;
+  _rtXdot->Integrator_CSTATE_i = machine_tool_B.IntegralGain_m;
+  _rtXdot->Integrator_CSTATE_m = machine_tool_B.Switch_p;
+  _rtXdot->Filter_CSTATE_e = machine_tool_B.FilterCoefficient_g;
 }
 
 void machine_tool_zeroCrossings(void)
@@ -420,29 +533,29 @@ void machine_tool_zeroCrossings(void)
   _rtZCSV->NotEqual_RelopInput_ZC = machine_tool_B.ZeroGain -
     machine_tool_B.DeadZone;
   _rtZCSV->SignPreSat_Input_ZC = machine_tool_B.DeadZone;
-  _rtZCSV->SignPreIntegrator_Input_ZC = machine_tool_B.IntegralGain;
+  _rtZCSV->SignPreIntegrator_Input_ZC = machine_tool_B.IntegralGain_l;
   _rtZCSV->Saturation_UprLim_ZC = DeadZone_UprReg_ZC_tmp;
   _rtZCSV->Saturation_LwrLim_ZC = DeadZone_LwrReg_ZC_tmp;
-  DeadZone_LwrReg_ZC_tmp = machine_tool_B.Sum_b - (-machine_tool_P.Ysat);
-  _rtZCSV->DeadZone_LwrReg_ZC_h = DeadZone_LwrReg_ZC_tmp;
-  DeadZone_UprReg_ZC_tmp = machine_tool_B.Sum_b - machine_tool_P.Ysat;
-  _rtZCSV->DeadZone_UprReg_ZC_m = DeadZone_UprReg_ZC_tmp;
-  _rtZCSV->NotEqual_RelopInput_ZC_p = machine_tool_B.ZeroGain_a -
-    machine_tool_B.DeadZone_n;
-  _rtZCSV->SignPreSat_Input_ZC_g = machine_tool_B.DeadZone_n;
-  _rtZCSV->SignPreIntegrator_Input_ZC_g = machine_tool_B.IntegralGain_n;
-  _rtZCSV->Saturation_UprLim_ZC_f = DeadZone_UprReg_ZC_tmp;
-  _rtZCSV->Saturation_LwrLim_ZC_a = DeadZone_LwrReg_ZC_tmp;
-  DeadZone_LwrReg_ZC_tmp = machine_tool_B.Sum_d - (-machine_tool_P.Zsat);
-  _rtZCSV->DeadZone_LwrReg_ZC_b = DeadZone_LwrReg_ZC_tmp;
-  DeadZone_UprReg_ZC_tmp = machine_tool_B.Sum_d - machine_tool_P.Zsat;
-  _rtZCSV->DeadZone_UprReg_ZC_n = DeadZone_UprReg_ZC_tmp;
-  _rtZCSV->NotEqual_RelopInput_ZC_i = machine_tool_B.ZeroGain_o -
+  DeadZone_LwrReg_ZC_tmp = machine_tool_B.Sum_n - (-machine_tool_P.Ysat);
+  _rtZCSV->DeadZone_LwrReg_ZC_g = DeadZone_LwrReg_ZC_tmp;
+  DeadZone_UprReg_ZC_tmp = machine_tool_B.Sum_n - machine_tool_P.Ysat;
+  _rtZCSV->DeadZone_UprReg_ZC_j = DeadZone_UprReg_ZC_tmp;
+  _rtZCSV->NotEqual_RelopInput_ZC_c = machine_tool_B.ZeroGain_n -
+    machine_tool_B.DeadZone_i;
+  _rtZCSV->SignPreSat_Input_ZC_o = machine_tool_B.DeadZone_i;
+  _rtZCSV->SignPreIntegrator_Input_ZC_h = machine_tool_B.IntegralGain_c;
+  _rtZCSV->Saturation_UprLim_ZC_e = DeadZone_UprReg_ZC_tmp;
+  _rtZCSV->Saturation_LwrLim_ZC_l = DeadZone_LwrReg_ZC_tmp;
+  DeadZone_LwrReg_ZC_tmp = machine_tool_B.Sum_l - (-machine_tool_P.Zsat);
+  _rtZCSV->DeadZone_LwrReg_ZC_i = DeadZone_LwrReg_ZC_tmp;
+  DeadZone_UprReg_ZC_tmp = machine_tool_B.Sum_l - machine_tool_P.Zsat;
+  _rtZCSV->DeadZone_UprReg_ZC_i = DeadZone_UprReg_ZC_tmp;
+  _rtZCSV->NotEqual_RelopInput_ZC_f = machine_tool_B.ZeroGain_i -
     machine_tool_B.DeadZone_g;
-  _rtZCSV->SignPreSat_Input_ZC_n = machine_tool_B.DeadZone_g;
-  _rtZCSV->SignPreIntegrator_Input_ZC_p = machine_tool_B.IntegralGain_m;
-  _rtZCSV->Saturation_UprLim_ZC_k = DeadZone_UprReg_ZC_tmp;
-  _rtZCSV->Saturation_LwrLim_ZC_e = DeadZone_LwrReg_ZC_tmp;
+  _rtZCSV->SignPreSat_Input_ZC_e = machine_tool_B.DeadZone_g;
+  _rtZCSV->SignPreIntegrator_Input_ZC_f = machine_tool_B.IntegralGain_k;
+  _rtZCSV->Saturation_UprLim_ZC_i = DeadZone_UprReg_ZC_tmp;
+  _rtZCSV->Saturation_LwrLim_ZC_h = DeadZone_LwrReg_ZC_tmp;
 }
 
 void machine_tool_initialize(void)
@@ -453,35 +566,53 @@ void machine_tool_initialize(void)
   machine_tool_PrevZCX.Integrator_Reset_ZCE = UNINITIALIZED_ZCSIG;
   machine_tool_PrevZCX.Integrator_Reset_ZCE_o = UNINITIALIZED_ZCSIG;
   machine_tool_PrevZCX.Integrator_Reset_ZCE_i = UNINITIALIZED_ZCSIG;
-  machine_tool_PrevZCX.Integrator_Reset_ZCE_it = UNINITIALIZED_ZCSIG;
   machine_tool_PrevZCX.Filter_Reset_ZCE = UNINITIALIZED_ZCSIG;
-  machine_tool_PrevZCX.Integrator_Reset_ZCE_h = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Integrator_Reset_ZCE_it = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Integrator_Reset_ZCE_g = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Filter_Reset_ZCE_m = UNINITIALIZED_ZCSIG;
   machine_tool_PrevZCX.Filter_Reset_ZCE_l = UNINITIALIZED_ZCSIG;
-  machine_tool_PrevZCX.Integrator_Reset_ZCE_ic = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Integrator_Reset_ZCE_h = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Integrator_Reset_ZCE_gd = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Filter_Reset_ZCE_c = UNINITIALIZED_ZCSIG;
   machine_tool_PrevZCX.Filter_Reset_ZCE_j = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Integrator_Reset_ZCE_ic = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Integrator_Reset_ZCE_k = UNINITIALIZED_ZCSIG;
+  machine_tool_PrevZCX.Filter_Reset_ZCE_g = UNINITIALIZED_ZCSIG;
   machine_tool_X.position = machine_tool_P.X0;
   machine_tool_X.position_i = machine_tool_P.Y0;
   machine_tool_X.position_c = machine_tool_P.Z0;
   machine_tool_X.speed = machine_tool_P.Xaxis_v0;
   machine_tool_X.speed_i = machine_tool_P.Yaxis_v0;
   machine_tool_X.speed_h = machine_tool_P.Zaxis_v0;
-  machine_tool_X.Integrator_CSTATE =
-    machine_tool_P.PIDController_InitialConditionForIntegrator;
   machine_tool_X.Filter_CSTATE =
     machine_tool_P.PIDController_InitialConditionForFilter;
+  machine_tool_X.Integrator_CSTATE =
+    machine_tool_P.PIDController_InitialConditionForIntegrator;
+  machine_tool_X.Integrator_CSTATE_g =
+    machine_tool_P.PIDController1_InitialConditionForIntegrator;
+  machine_tool_X.Filter_CSTATE_o =
+    machine_tool_P.PIDController1_InitialConditionForFilter;
   machine_tool_DW.Memory_PreviousInput = machine_tool_P.Memory_InitialCondition;
-  machine_tool_X.Integrator_CSTATE_d =
-    machine_tool_P.PIDController_InitialConditionForIntegrator_n;
   machine_tool_X.Filter_CSTATE_p =
     machine_tool_P.PIDController_InitialConditionForFilter_c;
-  machine_tool_DW.Memory_PreviousInput_j =
-    machine_tool_P.Memory_InitialCondition_l;
+  machine_tool_X.Integrator_CSTATE_d =
+    machine_tool_P.PIDController_InitialConditionForIntegrator_n;
+  machine_tool_X.Integrator_CSTATE_e =
+    machine_tool_P.PIDController1_InitialConditionForIntegrator_h;
+  machine_tool_X.Filter_CSTATE_m =
+    machine_tool_P.PIDController1_InitialConditionForFilter_p;
+  machine_tool_DW.Memory_PreviousInput_e =
+    machine_tool_P.Memory_InitialCondition_k;
+  machine_tool_X.Filter_CSTATE_oe =
+    machine_tool_P.PIDController_InitialConditionForFilter_n;
   machine_tool_X.Integrator_CSTATE_i =
     machine_tool_P.PIDController_InitialConditionForIntegrator_h;
-  machine_tool_X.Filter_CSTATE_o =
-    machine_tool_P.PIDController_InitialConditionForFilter_n;
-  machine_tool_DW.Memory_PreviousInput_a =
-    machine_tool_P.Memory_InitialCondition_i;
+  machine_tool_X.Integrator_CSTATE_m =
+    machine_tool_P.PIDController1_InitialConditionForIntegrator_m;
+  machine_tool_X.Filter_CSTATE_e =
+    machine_tool_P.PIDController1_InitialConditionForFilter_l;
+  machine_tool_DW.Memory_PreviousInput_n =
+    machine_tool_P.Memory_InitialCondition_d;
 }
 
 void machine_tool_terminate(void)
@@ -534,16 +665,19 @@ RT_MODEL_machine_tool_T *machine_tool(void)
                     &machine_tool_M->intgData);
 
   {
-    static uint8_T zcAttributes[33] = { (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
+    static uint8_T zcAttributes[39] = { (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
+      SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
       SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
       SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
       SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
       SL_ZCS_EVENT_ALL_UP), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
       (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
       (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
+      SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
       SL_ZCS_EVENT_ALL_UP), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
       (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
       (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
+      SL_ZCS_EVENT_ALL_UP), (0xc0|SL_ZCS_EVENT_ALL_UP), (0xc0|
       SL_ZCS_EVENT_ALL_UP), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
       (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL),
       (SL_ZCS_EVENT_ALL), (SL_ZCS_EVENT_ALL) };

@@ -58,8 +58,11 @@ extern void fmu_clearParameterUpdated(void);
 
 //convert uri to local path
 char* uriToLocal(const char *uri);
+void fmu_strncpy(char* dest, void* src, int size);
+char* fmu_strndup(const char* src, int size);
 
 extern int fmu_restoreSimScapeInitialState(void);
+
 
 void compareInputWithWorkingVec(void *dstWorkingVec, const void* srcBlkInput, const unsigned int* dimList, const size_t nVal, const size_t dstWorkingVecDTSize, const size_t srcBlkInputDTSize, int needConversion, int *is_diff_value);
 void updateVectorForFmu(void *dstWorkingVec, const void* srcBlkInput, const unsigned int* dimList, const size_t nVal, const size_t dstDTSize, const size_t srcDTSize, int needConversion);
