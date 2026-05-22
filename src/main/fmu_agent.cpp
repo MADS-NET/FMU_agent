@@ -213,6 +213,7 @@ int main(int argc, char *const *argv) {
   auto last_timestep = chrono::steady_clock::now();
   chrono::steady_clock::time_point now;
   double dt = 0, t = 0, t_in = 0, t_msg = 0;
+  int dtus = 0, stepus = 0;
   json status;
   array<string, 3> console_out;
 
@@ -276,10 +277,17 @@ int main(int argc, char *const *argv) {
       // timing
       now = chrono::steady_clock::now();
       if(plant.get_fixed_step()){
-          dt = static_cast<double>(period.count()) / 1e3;
-        } else{
-          dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
-                        .count() / 1e6;
+        dt = static_cast<double>(period.count()) / 1e3;
+        dtus = dt * 1e6;
+        stepus = plant.get_step_size() * 1e6;
+        if(dtus % stepus != 0){ // comparison in microseconds
+
+          throw std::runtime_error("The agent period must be a multiple of the model's fixed step");
+        }
+
+      } else{
+        dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
+                      .count() / 1e6;
 
           last_timestep = now;
       }
