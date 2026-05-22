@@ -96,6 +96,9 @@ public:
     std::vector<std::string> get_indep_names() const;
     std::vector<std::string> get_binary_dependencies() const;
 
+    int get_type() const { return static_cast<int>(_type); }
+    bool get_fixed_step() const { return _fixed_step; }
+
     struct SolverParams {
         double _rel_tol = 1e-6;
         double _abs_tol = 1e-8;
@@ -127,6 +130,7 @@ private:
 
     // FMU type variable
     FmuType _type = FmuType::Unknown;
+    bool _fixed_step = false;
 
     /// Resolve variable name to value reference
     fmi3ValueReference resolve_var_ref(const std::string& name) const;
