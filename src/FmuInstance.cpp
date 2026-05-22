@@ -551,9 +551,36 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
                              std::to_string(v));
   }
 
-  // Instantiate FMI3 CoSimulation component
-  _instance =
-      fmi3_instantiateModelExchange(_fmu, false, false, nullptr, nullptr);
+  _model_description_xml = read_model_description_xml(_fmu_path);
+  bool cs = _model_description_xml.find("<CoSimulation") != std::string::npos;
+  bool me = _model_description_xml.find("<ModelExchange") != std::string::npos;
+
+  if(cs){
+
+    _type = FmuType::CoSimulation;
+
+    _instance = fmi3_instantiateCoSimulation(
+      _fmu,
+      fmi3False, // visible
+      fmi3False, // loggingOn
+      fmi3False, // eventModeUsed
+      fmi3False, // earlyReturnAllowed
+      nullptr,   // requiredIntermediateVariables
+      0,         // nRequiredIntermediateVariables
+      nullptr,   // instanceEnvironment
+      nullptr,   // logMessage
+      nullptr    // intermediateUpdate
+    );
+
+  } else if(me){
+
+    _type = FmuType::ModelExchange;
+    _instance = fmi3_instantiateModelExchange(_fmu, false, false, nullptr, nullptr);
+
+  } else{
+
+    throw std::runtime_error("FMU Type: Unknown");
+  }
 
   if (!_instance) {
     fmi4c_freeFmu(_fmu);
@@ -658,166 +685,203 @@ void FmuWrapper::reset() {
 }
 
 void FmuWrapper::do_step(double dt) {
+
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");
   }
 
-  // Get the number of continuous states
-  size_t numStates = 0;
-  fmi3Status status = fmi3_getNumberOfContinuousStates(_instance, &numStates);
-  check_status(status, "getNumberOfContinuousStates");
+  if (_type == FmuType::CoSimulation) { // CO-SIMULATION
 
-  if (numStates == 0) {
-    // No states to integrate, just advance time and handle events
+    fmi3Boolean eventHandlingNeeded = fmi3False;
+    fmi3Boolean terminateSimulation = fmi3False;
+    fmi3Boolean earlyReturn = fmi3False;
+    fmi3Float64 lastSuccessfulTime = _current_time;
+
+    // exported solver within FMU
+    fmi3Status status = fmi3_doStep(_instance,
+                                    _current_time,
+                                    dt,
+                                    fmi3True, // noSetFMUStatePriorToCurrentPoint
+                                    &eventHandlingNeeded,
+                                    &terminateSimulation,
+                                    &earlyReturn,
+                                    &lastSuccessfulTime);
+                                    
+    check_status(status, "doStep");
+
+    if (terminateSimulation) {
+      throw std::runtime_error("FMU requested termination during doStep");
+    }
+
     _current_time += dt;
+
+    if (eventHandlingNeeded) {
+        fmi3_enterEventMode(_instance);
+        handle_events();
+        fmi3_enterStepMode(_instance);
+    }
+
+  } else if(_type == FmuType::ModelExchange){ // MODEL EXCHANGE
+
+    // Get the number of continuous states
+    size_t numStates = 0;
+    fmi3Status status = fmi3_getNumberOfContinuousStates(_instance, &numStates);
+    check_status(status, "getNumberOfContinuousStates");
+
+    if (numStates == 0) {
+      // No states to integrate, just advance time and handle events
+      _current_time += dt;
+      handle_events();
+      return;
+    }
+
+    // Adaptive RK45 integration parameters
+    const double &relTol = _solver_params._rel_tol;
+    const double &absTol = _solver_params._abs_tol;
+    const double &hmin = _solver_params._hmin;
+
+    double t = _current_time;
+    double tend = _current_time + dt;
+    double h = dt; // Initial step size
+
+    std::vector<fmi3Float64> y(numStates);
+    std::vector<fmi3Float64> ytemp(numStates);
+    std::vector<fmi3Float64> k1(numStates), k2(numStates), k3(numStates);
+    std::vector<fmi3Float64> k4(numStates), k5(numStates), k6(numStates);
+    std::vector<fmi3Float64> yerr(numStates);
+
+    // Get initial state
+    status = fmi3_getContinuousStates(_instance, y.data(), numStates);
+    check_status(status, "getContinuousStates");
+
+    // Adaptive stepping loop
+    while (t < tend && h > hmin) {
+      // Limit step to not overshoot tend
+      if (t + h > tend) {
+        h = tend - t;
+      }
+
+      // RK45 with Dormand-Prince coefficients
+      // Stage 1: k1 = f(t, y)
+      status =
+          fmi3_getContinuousStateDerivatives(_instance, k1.data(), numStates);
+      check_status(status, "getContinuousStateDerivatives at stage 1");
+
+      // Stage 2: k2 = f(t + (1/5)*h, y + (1/5)*h*k1)
+      for (size_t i = 0; i < numStates; ++i) {
+        ytemp[i] = y[i] + (h / 5.0) * k1[i];
+      }
+      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
+      check_status(status, "setContinuousStates at stage 2");
+      status =
+          fmi3_getContinuousStateDerivatives(_instance, k2.data(), numStates);
+      check_status(status, "getContinuousStateDerivatives at stage 2");
+
+      // Stage 3: k3 = f(t + (3/10)*h, y + (3/40)*h*k1 + (9/40)*h*k2)
+      for (size_t i = 0; i < numStates; ++i) {
+        ytemp[i] = y[i] + (3.0 / 40.0) * h * k1[i] + (9.0 / 40.0) * h * k2[i];
+      }
+      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
+      check_status(status, "setContinuousStates at stage 3");
+      status =
+          fmi3_getContinuousStateDerivatives(_instance, k3.data(), numStates);
+      check_status(status, "getContinuousStateDerivatives at stage 3");
+
+      // Stage 4: k4 = f(t + (4/5)*h, y + (44/45)*h*k1 - (56/15)*h*k2 +
+      // (32/9)*h*k3)
+      for (size_t i = 0; i < numStates; ++i) {
+        ytemp[i] = y[i] + (44.0 / 45.0) * h * k1[i] - (56.0 / 15.0) * h * k2[i] +
+                  (32.0 / 9.0) * h * k3[i];
+      }
+      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
+      check_status(status, "setContinuousStates at stage 4");
+      status =
+          fmi3_getContinuousStateDerivatives(_instance, k4.data(), numStates);
+      check_status(status, "getContinuousStateDerivatives at stage 4");
+
+      // Stage 5: k5 = f(t + (8/9)*h, y + ...)
+      for (size_t i = 0; i < numStates; ++i) {
+        ytemp[i] = y[i] + (19372.0 / 6561.0) * h * k1[i] -
+                  (25360.0 / 2187.0) * h * k2[i] +
+                  (64448.0 / 6561.0) * h * k3[i] - (212.0 / 729.0) * h * k4[i];
+      }
+      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
+      check_status(status, "setContinuousStates at stage 5");
+      status =
+          fmi3_getContinuousStateDerivatives(_instance, k5.data(), numStates);
+      check_status(status, "getContinuousStateDerivatives at stage 5");
+
+      // Stage 6: k6 = f(t + h, y + ...)
+      for (size_t i = 0; i < numStates; ++i) {
+        ytemp[i] = y[i] + (9017.0 / 3168.0) * h * k1[i] -
+                  (355.0 / 33.0) * h * k2[i] + (46732.0 / 5247.0) * h * k3[i] +
+                  (49.0 / 176.0) * h * k4[i] - (5103.0 / 18656.0) * h * k5[i];
+      }
+      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
+      check_status(status, "setContinuousStates at stage 6");
+      status =
+          fmi3_getContinuousStateDerivatives(_instance, k6.data(), numStates);
+      check_status(status, "getContinuousStateDerivatives at stage 6");
+
+      // 5th order solution: y_new = y + h * (35/384*k1 + 500/1113*k3 + 125/192*k4
+      // - 2187/6784*k5 + 11/84*k6) 4th order solution for error: y_hat = y + h *
+      // (5179/57600*k1 + 7571/16695*k3 + 393/640*k4 - 92097/339200*k5 +
+      // 187/2100*k6)
+      std::vector<fmi3Float64> ynew(numStates);
+      for (size_t i = 0; i < numStates; ++i) {
+        ynew[i] = y[i] + h * (35.0 / 384.0 * k1[i] + 500.0 / 1113.0 * k3[i] +
+                              125.0 / 192.0 * k4[i] - 2187.0 / 6784.0 * k5[i] +
+                              11.0 / 84.0 * k6[i]);
+
+        // Error estimate (difference between 5th and 4th order)
+        double y4th =
+            y[i] + h * (5179.0 / 57600.0 * k1[i] + 7571.0 / 16695.0 * k3[i] +
+                        393.0 / 640.0 * k4[i] - 92097.0 / 339200.0 * k5[i] +
+                        187.0 / 2100.0 * k6[i]);
+        yerr[i] = std::abs(ynew[i] - y4th);
+      }
+
+      // Compute maximum relative error
+      double maxError = 0.0;
+      for (size_t i = 0; i < numStates; ++i) {
+        double scale = absTol + relTol * std::abs(y[i]);
+        double error = yerr[i] / scale;
+        maxError = std::max(maxError, error);
+      }
+
+      // Adaptive step size control
+      if (maxError <= 1.0) {
+        // Step accepted: update y and t
+        y = ynew;
+        t += h;
+        _current_time = t;
+
+        // Set accepted state into FMU
+        status = fmi3_setContinuousStates(_instance, y.data(), numStates);
+        check_status(status, "setContinuousStates (accepted step)");
+
+        // Increase step size for next iteration (but not too aggressively)
+        h *= 0.9 * std::pow(1.0 / maxError, 0.2);
+        h = std::min(h, 10.0 * (tend - t)); // Don't let h grow too much
+      } else {
+        // Step rejected: reduce step size
+        h *= 0.9 * std::pow(1.0 / maxError, 0.25);
+      }
+
+      // Enforce minimum step size to prevent infinite loops
+      if (h < hmin) {
+        h = hmin;
+      }
+    }
+
+    // Ensure we're exactly at tend
+    _current_time = tend;
+
+    // Handle events at the end of the step
     handle_events();
-    return;
   }
 
-  // Adaptive RK45 integration parameters
-  const double &relTol = _solver_params._rel_tol;
-  const double &absTol = _solver_params._abs_tol;
-  const double &hmin = _solver_params._hmin;
-
-  double t = _current_time;
-  double tend = _current_time + dt;
-  double h = dt; // Initial step size
-
-  std::vector<fmi3Float64> y(numStates);
-  std::vector<fmi3Float64> ytemp(numStates);
-  std::vector<fmi3Float64> k1(numStates), k2(numStates), k3(numStates);
-  std::vector<fmi3Float64> k4(numStates), k5(numStates), k6(numStates);
-  std::vector<fmi3Float64> yerr(numStates);
-
-  // Get initial state
-  status = fmi3_getContinuousStates(_instance, y.data(), numStates);
-  check_status(status, "getContinuousStates");
-
-  // Adaptive stepping loop
-  while (t < tend && h > hmin) {
-    // Limit step to not overshoot tend
-    if (t + h > tend) {
-      h = tend - t;
-    }
-
-    // RK45 with Dormand-Prince coefficients
-    // Stage 1: k1 = f(t, y)
-    status =
-        fmi3_getContinuousStateDerivatives(_instance, k1.data(), numStates);
-    check_status(status, "getContinuousStateDerivatives at stage 1");
-
-    // Stage 2: k2 = f(t + (1/5)*h, y + (1/5)*h*k1)
-    for (size_t i = 0; i < numStates; ++i) {
-      ytemp[i] = y[i] + (h / 5.0) * k1[i];
-    }
-    status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    check_status(status, "setContinuousStates at stage 2");
-    status =
-        fmi3_getContinuousStateDerivatives(_instance, k2.data(), numStates);
-    check_status(status, "getContinuousStateDerivatives at stage 2");
-
-    // Stage 3: k3 = f(t + (3/10)*h, y + (3/40)*h*k1 + (9/40)*h*k2)
-    for (size_t i = 0; i < numStates; ++i) {
-      ytemp[i] = y[i] + (3.0 / 40.0) * h * k1[i] + (9.0 / 40.0) * h * k2[i];
-    }
-    status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    check_status(status, "setContinuousStates at stage 3");
-    status =
-        fmi3_getContinuousStateDerivatives(_instance, k3.data(), numStates);
-    check_status(status, "getContinuousStateDerivatives at stage 3");
-
-    // Stage 4: k4 = f(t + (4/5)*h, y + (44/45)*h*k1 - (56/15)*h*k2 +
-    // (32/9)*h*k3)
-    for (size_t i = 0; i < numStates; ++i) {
-      ytemp[i] = y[i] + (44.0 / 45.0) * h * k1[i] - (56.0 / 15.0) * h * k2[i] +
-                 (32.0 / 9.0) * h * k3[i];
-    }
-    status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    check_status(status, "setContinuousStates at stage 4");
-    status =
-        fmi3_getContinuousStateDerivatives(_instance, k4.data(), numStates);
-    check_status(status, "getContinuousStateDerivatives at stage 4");
-
-    // Stage 5: k5 = f(t + (8/9)*h, y + ...)
-    for (size_t i = 0; i < numStates; ++i) {
-      ytemp[i] = y[i] + (19372.0 / 6561.0) * h * k1[i] -
-                 (25360.0 / 2187.0) * h * k2[i] +
-                 (64448.0 / 6561.0) * h * k3[i] - (212.0 / 729.0) * h * k4[i];
-    }
-    status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    check_status(status, "setContinuousStates at stage 5");
-    status =
-        fmi3_getContinuousStateDerivatives(_instance, k5.data(), numStates);
-    check_status(status, "getContinuousStateDerivatives at stage 5");
-
-    // Stage 6: k6 = f(t + h, y + ...)
-    for (size_t i = 0; i < numStates; ++i) {
-      ytemp[i] = y[i] + (9017.0 / 3168.0) * h * k1[i] -
-                 (355.0 / 33.0) * h * k2[i] + (46732.0 / 5247.0) * h * k3[i] +
-                 (49.0 / 176.0) * h * k4[i] - (5103.0 / 18656.0) * h * k5[i];
-    }
-    status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-    check_status(status, "setContinuousStates at stage 6");
-    status =
-        fmi3_getContinuousStateDerivatives(_instance, k6.data(), numStates);
-    check_status(status, "getContinuousStateDerivatives at stage 6");
-
-    // 5th order solution: y_new = y + h * (35/384*k1 + 500/1113*k3 + 125/192*k4
-    // - 2187/6784*k5 + 11/84*k6) 4th order solution for error: y_hat = y + h *
-    // (5179/57600*k1 + 7571/16695*k3 + 393/640*k4 - 92097/339200*k5 +
-    // 187/2100*k6)
-    std::vector<fmi3Float64> ynew(numStates);
-    for (size_t i = 0; i < numStates; ++i) {
-      ynew[i] = y[i] + h * (35.0 / 384.0 * k1[i] + 500.0 / 1113.0 * k3[i] +
-                            125.0 / 192.0 * k4[i] - 2187.0 / 6784.0 * k5[i] +
-                            11.0 / 84.0 * k6[i]);
-
-      // Error estimate (difference between 5th and 4th order)
-      double y4th =
-          y[i] + h * (5179.0 / 57600.0 * k1[i] + 7571.0 / 16695.0 * k3[i] +
-                      393.0 / 640.0 * k4[i] - 92097.0 / 339200.0 * k5[i] +
-                      187.0 / 2100.0 * k6[i]);
-      yerr[i] = std::abs(ynew[i] - y4th);
-    }
-
-    // Compute maximum relative error
-    double maxError = 0.0;
-    for (size_t i = 0; i < numStates; ++i) {
-      double scale = absTol + relTol * std::abs(y[i]);
-      double error = yerr[i] / scale;
-      maxError = std::max(maxError, error);
-    }
-
-    // Adaptive step size control
-    if (maxError <= 1.0) {
-      // Step accepted: update y and t
-      y = ynew;
-      t += h;
-      _current_time = t;
-
-      // Set accepted state into FMU
-      status = fmi3_setContinuousStates(_instance, y.data(), numStates);
-      check_status(status, "setContinuousStates (accepted step)");
-
-      // Increase step size for next iteration (but not too aggressively)
-      h *= 0.9 * std::pow(1.0 / maxError, 0.2);
-      h = std::min(h, 10.0 * (tend - t)); // Don't let h grow too much
-    } else {
-      // Step rejected: reduce step size
-      h *= 0.9 * std::pow(1.0 / maxError, 0.25);
-    }
-
-    // Enforce minimum step size to prevent infinite loops
-    if (h < hmin) {
-      h = hmin;
-    }
-  }
-
-  // Ensure we're exactly at tend
-  _current_time = tend;
-
-  // Handle events at the end of the step
-  handle_events();
+  
 }
 
 void FmuWrapper::handle_events() {
