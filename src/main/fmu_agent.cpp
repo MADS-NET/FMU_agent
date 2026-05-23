@@ -213,7 +213,8 @@ int main(int argc, char *const *argv) {
   auto last_timestep = chrono::steady_clock::now();
   chrono::steady_clock::time_point now;
   double dt = 0, t = 0, t_in = 0, t_msg = 0;
-  int dtus = 0, stepus = 0;
+  int dtus = 0, step_s = 0;
+  static double t_buffer = 0.0;
   json status;
   array<string, 3> console_out;
 
@@ -251,9 +252,32 @@ int main(int argc, char *const *argv) {
     agent.loop([&]() -> chrono::milliseconds {
       if (agent.receive(false) == message_type::json && agent.last_topic() != "control") {
         now = chrono::steady_clock::now();
+
         dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
-                .count() / 1e6;
+                .count();
         last_timestep = now;
+
+        if(plant.get_fixed_step()){
+
+          t_buffer += dt;
+          step_s = plant.get_step_size() * 1e6; // us
+          
+          int num_steps = t_buffer / step_s;
+          if(num_steps > 0){
+            dt = num_steps * step_s; // force dt
+            t_buffer -= dt; // t_buffer will contain the residual
+          } else{
+            console_out[2] = "Skipped step: " + to_string(t_buffer) + "s";
+            cout << goback(3) << fg::yellow << "Last message: " << console_out[0]
+                 << fg::reset << endl
+                 << "Received: " << console_out[1] << endl
+                 << "Status update after: " << console_out[2] << endl
+                 << "buffer: " << t_buffer << " dt: " << dt << endl;
+            return 0ms;
+          }
+        }
+
+        dt = dt / 1e6;
         t += dt;
         console_out[2] = to_string(t) + " s";
         plant.do_step(dt);
@@ -279,8 +303,8 @@ int main(int argc, char *const *argv) {
       if(plant.get_fixed_step()){
         dt = static_cast<double>(period.count()) / 1e3;
         dtus = dt * 1e6;
-        stepus = plant.get_step_size() * 1e6;
-        if(dtus % stepus != 0){ // comparison in microseconds
+        step_s = plant.get_step_size() * 1e6; // us
+        if(dtus % step_s != 0){ // comparison in microseconds
 
           throw std::runtime_error("The agent period must be a multiple of the model's fixed step");
         }
