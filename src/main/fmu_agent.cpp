@@ -290,10 +290,23 @@ int main(int argc, char *const *argv) {
         auto in = json::parse(get<1>(msg));
         process_input(in);
       }
-      cout << goback(3) << fg::yellow << "Last message: " << console_out[0]
-            << fg::reset << endl
-            << "Received: " << console_out[1] << endl
-            << "Status update after: " << console_out[2] << endl;
+
+      if(plant.get_fixed_step()){
+        cout << goback(5) << fg::yellow << "Last message: " << console_out[0]
+          << fg::reset << endl
+          << "Received: " << console_out[1] << endl
+          << "Status update after: " << console_out[2] << endl
+          << "Buffer: " << t_buffer << "us" << endl
+          << "Simulation dt: " << dt << "s" << endl;
+
+      } else{
+        cout << goback(4) << fg::yellow << "Last message: " << console_out[0]
+          << fg::reset << endl
+          << "Received: " << console_out[1] << endl
+          << "Status update after: " << console_out[2] << endl
+          << "Simulation dt: " << dt << "s" << endl;
+      }
+      
       return 0ms;
     });
   } else {
