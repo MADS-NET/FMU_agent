@@ -14,7 +14,9 @@
 #include <mads.hpp>
 #include <rang.hpp>
 #include <array>
+#ifndef __linux__
 #include <format>
+#endif 
 
 using namespace std;
 using namespace chrono_literals;

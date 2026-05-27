@@ -13,7 +13,7 @@ else()
 endif()
 if(WIN32)
   add_compile_options(/wd4005)
-else()
+elseif(APPLE)
   add_compile_options(-Wno-deprecated-literal-operator)
 endif()
 
