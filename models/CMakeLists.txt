@@ -98,7 +98,7 @@ macro(add_fmu_library LIB_NAME)
     message(STATUS \"Created FMU package: ${FMU_DESTINATION}.fmu\")
   "
     COMPONENT ${FMU_INSTALL_COMPONENT}
-    EXCLUDE_FROM_ALL
+    # EXCLUDE_FROM_ALL
   )
 endmacro()
 
