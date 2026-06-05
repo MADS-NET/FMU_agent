@@ -23,10 +23,10 @@ target_link_libraries(fmu-test PRIVATE fmiinterface)
 
 # Agent
 add_executable(mads-fmu fmu_agent.cpp)
-target_include_directories(mads-fmu BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/src/compat)
+target_include_directories(mads-fmu BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/src/compat")
 if(WIN32)
   target_compile_definitions(mads-fmu PRIVATE _HAS_STD_BYTE=0)
-  link_directories(${MADS_PREFIX}/lib ${MADS_PREFIX}/bin)
+  link_directories("${MADS_PREFIX}/lib" "${MADS_PREFIX}/bin")
   target_link_libraries(mads-fmu PRIVATE fmiinterface Ws2_32 bcrypt Secur32 Crypt32 Dnsapi IPHLPAPI MadsCore)
 else()
   target_link_libraries(mads-fmu PRIVATE fmiinterface cxxopts MadsCore)

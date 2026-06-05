@@ -26,15 +26,42 @@ if(CMAKE_BUILD_TYPE STREQUAL "")
 endif()
 
 # Get MADS prefix
-execute_process(
-  COMMAND mads -p
-  OUTPUT_VARIABLE MADS_PREFIX_RAW
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+set(MADS_ROOT "" CACHE PATH "Path to the MADS installation prefix")
+if(MADS_ROOT)
+  set(MADS_PREFIX_RAW "${MADS_ROOT}")
+elseif(DEFINED ENV{MADS_ROOT} AND NOT "$ENV{MADS_ROOT}" STREQUAL "")
+  set(MADS_PREFIX_RAW "$ENV{MADS_ROOT}")
+else()
+  execute_process(
+    COMMAND mads -p
+    RESULT_VARIABLE MADS_PREFIX_RESULT
+    OUTPUT_VARIABLE MADS_PREFIX_RAW
+    ERROR_VARIABLE MADS_PREFIX_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_STRIP_TRAILING_WHITESPACE
+  )
+  if(NOT MADS_PREFIX_RESULT STREQUAL "0" OR MADS_PREFIX_RAW STREQUAL "")
+    message(FATAL_ERROR
+      "Could not determine the MADS installation prefix. "
+      "Set -DMADS_ROOT=<path> or make sure 'mads -p' works."
+    )
+  endif()
+endif()
+string(STRIP "${MADS_PREFIX_RAW}" MADS_PREFIX_RAW)
 file(TO_CMAKE_PATH "${MADS_PREFIX_RAW}" MADS_PREFIX)
-include_directories(${MADS_PREFIX}/include)
-link_directories(${MADS_PREFIX}/lib)
-set_property(CACHE CMAKE_INSTALL_PREFIX PROPERTY VALUE ${MADS_PREFIX})
+set(MADS_ROOT "${MADS_PREFIX}" CACHE PATH "Path to the MADS installation prefix" FORCE)
+if(NOT EXISTS "${MADS_PREFIX}/include/agent.hpp")
+  message(FATAL_ERROR
+    "MADS headers not found at '${MADS_PREFIX}/include'. "
+    "Set -DMADS_ROOT to a valid MADS installation prefix."
+  )
+endif()
+
+include_directories("${MADS_PREFIX}/include")
+link_directories("${MADS_PREFIX}/lib")
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "${MADS_PREFIX}" CACHE PATH "Install prefix" FORCE)
+endif()
 
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
   # No warning on FetchContent_Populate
