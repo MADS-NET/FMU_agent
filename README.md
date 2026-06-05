@@ -1,3 +1,5 @@
+[![Build and Release](https://github.com/MADS-NET/fmu_agent/actions/workflows/release.yml/badge.svg)](https://github.com/MADS-NET/fmu_agent/actions/workflows/release.yml)
+
 # FMU Agent for MADS
 
 This repository Produces a monolithic [MADS](https://github.com/pbosetti/mads) agent that can run a simulation model (a `.fmu` file) in [FMI3](https://fmi-standard.org/docs/3.0/) format. 
