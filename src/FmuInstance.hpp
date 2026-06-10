@@ -21,6 +21,12 @@ extern "C" {
 
 using json = nlohmann::json;
 
+enum class FmuType{
+    Unknown,
+    ModelExchange,
+    CoSimulation
+};
+
 class FmuWrapper {
 public:
     FmuWrapper() {}
@@ -90,6 +96,10 @@ public:
     std::vector<std::string> get_indep_names() const;
     std::vector<std::string> get_binary_dependencies() const;
 
+    int get_type() const { return static_cast<int>(_type); }
+    bool get_fixed_step() const { return _fixed_step; }
+    double get_step_size() const { return _step_size; }
+
     struct SolverParams {
         double _rel_tol = 1e-6;
         double _abs_tol = 1e-8;
@@ -118,6 +128,11 @@ private:
     static const std::unordered_map<int, std::string> _initial_kind_map;
     static const std::unordered_map<fmi3Causality, std::string> _causality_map;
     static const std::unordered_map<fmi3DataType, std::string> _data_type_map;
+
+    // FMU type variable
+    FmuType _type = FmuType::Unknown;
+    bool _fixed_step = false;
+    double _step_size = 0.0;
 
     /// Resolve variable name to value reference
     fmi3ValueReference resolve_var_ref(const std::string& name) const;
