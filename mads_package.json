@@ -1,0 +1,25 @@
+{
+  "name": "FMU_agent",
+  "requirements": {
+    "Common": {
+      "note": ["Requires MADS 2.1.0 or later"] 
+    },
+    "Windows": {
+      "note": ["Requires Windows 10 or later"],
+      "commands": []
+    },
+    "Linux": {
+      "note": ["Requires Ubuntu 22.04 or later"],
+      "commands": []
+    },
+    "macOS": {
+      "note": [
+        "Requires macOS 10.15 or later",
+        "You might need to remove the quarantine protection on the plugin once installed"
+      ],
+      "commands": [
+        "xattr -d com.apple.quarantine $(mads -p)/bin/mads-fmu"
+      ]
+    }
+  }
+}

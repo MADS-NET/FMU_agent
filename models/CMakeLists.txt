@@ -85,16 +85,31 @@ macro(add_fmu_library LIB_NAME)
   )
 
   install(CODE "
+    file(REMOVE \"${FMU_DESTINATION}.fmu\")
+
     if(WIN32)
       execute_process(
         COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command \"Compress-Archive -Path '${FMU_DESTINATION}/*' -DestinationPath '${FMU_DESTINATION}.fmu' -Force\"
+        RESULT_VARIABLE fmu_archive_result
+        ERROR_VARIABLE fmu_archive_error
       )
     else()
       execute_process(
-        COMMAND ${CMAKE_COMMAND} -E tar -cf ${FMU_DESTINATION}.fmu --format=zip .
-        WORKING_DIRECTORY ${FMU_DESTINATION}
+        COMMAND \"${CMAKE_COMMAND}\" -E tar cf \"${FMU_DESTINATION}.fmu\" --format=zip .
+        WORKING_DIRECTORY \"${FMU_DESTINATION}\"
+        RESULT_VARIABLE fmu_archive_result
+        ERROR_VARIABLE fmu_archive_error
       )
     endif()
+
+    if(NOT fmu_archive_result EQUAL 0)
+      message(FATAL_ERROR \"Failed to create FMU package ${FMU_DESTINATION}.fmu: \${fmu_archive_error}\")
+    endif()
+
+    if(NOT EXISTS \"${FMU_DESTINATION}.fmu\")
+      message(FATAL_ERROR \"FMU package was not created: ${FMU_DESTINATION}.fmu\")
+    endif()
+
     message(STATUS \"Created FMU package: ${FMU_DESTINATION}.fmu\")
   "
     COMPONENT ${FMU_INSTALL_COMPONENT}

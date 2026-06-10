@@ -1,3 +1,6 @@
+[![Build and Release](https://github.com/MADS-NET/fmu_agent/actions/workflows/release.yml/badge.svg)](https://github.com/MADS-NET/fmu_agent/actions/workflows/release.yml) ![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FMADS-NET%2F.github%2Fmain%2Fprofile%2Fpackages.json&query=%24.packages.%5B'mads-fmu'%5D.type&label=mads%20package&logo=C%2B%2B)
+
+
 # FMU Agent for MADS
 
 This repository Produces a monolithic [MADS](https://github.com/pbosetti/mads) agent that can run a simulation model (a `.fmu` file) in [FMI3](https://fmi-standard.org/docs/3.0/) format. 
@@ -7,6 +10,14 @@ Functional Mockup Units (`.fmu` files) can be exported from a large number of si
 > This agent has been updated for MADS v2
 
 > **NOTE:** Only the last format of FMI format, i.e. FMI 3.0, is supported.
+
+## Package install
+
+with MADS v2.1.1 or later, install with:
+
+```bash
+mads package --install mads-fmu
+```
 
 ## Build
 
