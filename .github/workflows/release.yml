@@ -78,7 +78,7 @@ jobs:
           curl -fsSL \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "User-Agent: mads-chat-ci" \
+            -H "User-Agent: mads-fmu-ci" \
             "https://api.github.com/repos/pbosetti/MADS/releases/latest" \
             -o "$RUNNER_TEMP/mads-release/latest.json"
 
@@ -104,7 +104,7 @@ jobs:
             -H "Accept: application/octet-stream" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "User-Agent: mads-chat-ci" \
+            -H "User-Agent: mads-fmu-ci" \
             "$asset_url" \
             -o "$RUNNER_TEMP/mads-release/mads.tar.gz"
 
@@ -134,7 +134,7 @@ jobs:
           curl -fsSL \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "User-Agent: mads-chat-ci" \
+            -H "User-Agent: mads-fmu-ci" \
             "https://api.github.com/repos/pbosetti/MADS/releases/latest" \
             -o "$RUNNER_TEMP/mads-release/latest.json"
 
@@ -161,7 +161,7 @@ jobs:
             -H "Accept: application/octet-stream" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "User-Agent: mads-chat-ci" \
+            -H "User-Agent: mads-fmu-ci" \
             "$asset_url" \
             -o "$installer"
 
@@ -191,7 +191,7 @@ jobs:
             Authorization = "Bearer $env:GH_TOKEN"
             Accept = "application/vnd.github+json"
             "X-GitHub-Api-Version" = "2022-11-28"
-            "User-Agent" = "mads-chat-ci"
+            "User-Agent" = "mads-fmu-ci"
           }
 
           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/pbosetti/MADS/releases/latest" -Headers $headers
@@ -208,7 +208,7 @@ jobs:
             Authorization = "Bearer $env:GH_TOKEN"
             Accept = "application/octet-stream"
             "X-GitHub-Api-Version" = "2022-11-28"
-            "User-Agent" = "mads-chat-ci"
+            "User-Agent" = "mads-fmu-ci"
           }
           Invoke-WebRequest -Uri $asset.url -Headers $downloadHeaders -OutFile $installer
 
@@ -276,7 +276,7 @@ jobs:
       - name: Upload package
         uses: actions/upload-artifact@v7
         with:
-          name: mads-chat-${{ matrix.package }}
+          name: mads-fmu-${{ matrix.package }}
           path: build/*.zip
           if-no-files-found: error
 
@@ -292,7 +292,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
-          pattern: mads-chat-*
+          pattern: mads-fmu-*
           path: dist
           merge-multiple: true
 
