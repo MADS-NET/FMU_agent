@@ -256,6 +256,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PWD/package" \
             -DMADS_ROOT="$MADS_ROOT" \
+            -DMADS_BUILD_FMU=ON \
+            -DMADS_INSTALL_AGENT=ON \
             "${extra_args[@]}"
 
       - name: Configure
@@ -265,7 +267,9 @@ jobs:
           cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             "-DCMAKE_INSTALL_PREFIX=$env:GITHUB_WORKSPACE\package" `
-            "-DMADS_ROOT=$env:MADS_ROOT"
+            "-DMADS_ROOT=$env:MADS_ROOT" `
+            "-DMADS_BUILD_FMU=ON" `
+            "-DMADS_INSTALL_AGENT=ON"
 
       - name: Build
         run: cmake --build build --config Release --parallel
