@@ -6,7 +6,7 @@
 #                             |___/                
 cmake_minimum_required(VERSION 3.28)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-project(FMU_agent VERSION 2.3.0 LANGUAGES C CXX)
+project(FMU_agent VERSION 2.5.0 LANGUAGES C CXX)
 # set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
 
 # PROJECT SETTINGS #############################################################

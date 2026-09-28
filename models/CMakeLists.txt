@@ -89,9 +89,14 @@ macro(add_fmu_library LIB_NAME)
 
     if(WIN32)
       execute_process(
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command \"Compress-Archive -Path '${FMU_DESTINATION}/*' -DestinationPath '${FMU_DESTINATION}.fmu' -Force\"
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command \"Compress-Archive -Path '${FMU_DESTINATION}/*' -DestinationPath '${FMU_DESTINATION}.zip' -Force\"
         RESULT_VARIABLE fmu_archive_result
         ERROR_VARIABLE fmu_archive_error
+      )
+      execute_process(
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command \"Rename-Item -Path '${FMU_DESTINATION}.zip' -NewName '${FMU_DESTINATION}.fmu' -Force\"
+        RESULT_VARIABLE fmu_rename_result
+        ERROR_VARIABLE fmu_rename_error
       )
     else()
       execute_process(
@@ -101,7 +106,6 @@ macro(add_fmu_library LIB_NAME)
         ERROR_VARIABLE fmu_archive_error
       )
     endif()
-
     if(NOT fmu_archive_result EQUAL 0)
       message(FATAL_ERROR \"Failed to create FMU package ${FMU_DESTINATION}.fmu: \${fmu_archive_error}\")
     endif()
