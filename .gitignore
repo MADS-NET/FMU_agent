@@ -6,3 +6,4 @@ build
 *.fmu
 mads_chat_settings.json
 imgui.ini
+.DS_Store
