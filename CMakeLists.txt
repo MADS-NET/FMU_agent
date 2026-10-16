@@ -84,13 +84,9 @@ message(STATUS "Example FMUs will be compiled and install_fmu will be available:
 #  |____/ \___| .__/ \___|_| |_|\__,_|\___|_| |_|\___|_|\___||___/
 #             |_|                                                 
 
+# cxxopts is header-only and provided by the MADS installation
+# (${MADS_PREFIX}/include/cxxopts.hpp), alongside LibMadsCore
 include(FetchContent)
-FetchContent_Declare(cxxopts
-  GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
-  GIT_TAG        v3.1.1
-  GIT_SHALLOW    TRUE
-  EXCLUDE_FROM_ALL
-)
 
 set(FMI4C_BUILD_TESTS ON CACHE BOOL "" FORCE)
 set(FMI4C_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
@@ -107,8 +103,6 @@ FetchContent_Declare(
 # Disabilita le install() della dependency
 set(_old_skip ${CMAKE_SKIP_INSTALL_RULES})
 set(CMAKE_SKIP_INSTALL_RULES ON)
-FetchContent_Populate(cxxopts)
-add_subdirectory(${cxxopts_SOURCE_DIR} ${cxxopts_BINARY_DIR} EXCLUDE_FROM_ALL)
 FetchContent_Populate(fmi4c)
 add_subdirectory(${fmi4c_SOURCE_DIR} ${fmi4c_BINARY_DIR} EXCLUDE_FROM_ALL)
 set(CMAKE_SKIP_INSTALL_RULES ${_old_skip})

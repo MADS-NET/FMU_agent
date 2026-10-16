@@ -8,16 +8,10 @@ This repository Produces a monolithic [MADS](https://github.com/pbosetti/mads) a
 Functional Mockup Units (`.fmu` files) can be exported from a large number of simulation softwares like MATLAB Simulink.
 
 > This agent has been updated for MADS v2.4.3
-
+>
 > **NOTE:** Only the last format of FMI format, i.e. FMI 3.0, is supported.
-
-## Package install
-
-with MADS v2.1.1 or later, install with:
-
-```bash
-mads package --install mads-fmu
-```
+> 
+> **ABI compatibility**: Different MADS versions may have different [ABI](https://en.wikipedia.org/wiki/Application_binary_interface), so whenever you upgrade MADS, you should also recompile (and re-install) the Python agent plugin.
 
 ## Build
 
