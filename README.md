@@ -33,7 +33,9 @@ A few notes:
 
 ## FMUs
 
-Currently, only **model exchange** FMUs are supported. Co-simulation FMUs are not supported.
+Both **model exchange** and **co-simulation** FMUs are supported. The FMU type is detected automatically and printed at startup.
+
+> **NOTE:** co-simulation FMUs must be exported with a **fixed-step solver**, and the agent period must be a multiple of the solver step size. Variable-step co-simulation FMUs need the MATLAB Runtime installed on the machine, so they won't run standalone.
 
 ### Example FMUs
 
