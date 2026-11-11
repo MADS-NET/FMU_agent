@@ -9,6 +9,7 @@
 #include "../goback.hpp"
 #include <agent.hpp>
 #include <chrono>
+#include <cmath>
 #include <cxxopts.hpp>
 #include <filesystem>
 #include <mads.hpp>
@@ -29,7 +30,9 @@ bool inspect_fmu(filesystem::path const &path) {
     cout << fg::red << "No file at " << path << fg::reset << endl;
     return false;
   }
-  auto fmu = FmuWrapper(path.string(), "plant");
+  FmuWrapper fmu(path.string(), "plant");
+  fmu.initialize();
+  const FmuWrapper::SolverParams defaults;
   auto model_name = fmu.model_name();
   
   cout << style::bold 
@@ -45,13 +48,13 @@ bool inspect_fmu(filesystem::path const &path) {
        << "\nperiod = 100"
        << "\npub_topic = \"fmu_" <<  model_name << "\""
        << "\nsub_topic = [\"" <<  model_name << "_control\"]"
-       << "\nrelative_tol = 1e-4"
-       << "\nabsolute_tol = 1e-5"
-       << "\nhmin_tol = 1e-10" 
+       << "\nrelative_tol = " << defaults._rel_tol
+       << "\nabsolute_tol = " << defaults._abs_tol
+       << "\nhmin = " << defaults._hmin
        << "\n[fmu_" << model_name << ".parameters]"
        << "\n# default values from FMU";
   for (const auto &param : fmu.get_param_names()) {
-    cout << "\n" << param << " = " << fmu.get_real(param);
+    cout << "\n" << param << " = " << fmu.value(param).dump();
   }
   cout << fg::reset << endl;
 
@@ -76,11 +79,6 @@ int main(int argc, char *const *argv) {
   chrono::milliseconds period{100};
   // FMI-related
   filesystem::path fmu_path;
-  FmuWrapper fmu;
-  string plant_name = "plant";
-  double relative_tol = 1e-5;
-  double absolute_tol = 1e-7;
-  double hmin = 1e-12;
 
   // Parse command line options ================================================
   Options options(argv[0]);
@@ -153,14 +151,51 @@ int main(int argc, char *const *argv) {
   if (options_parsed.count("period") != 0) {
     period = chrono::milliseconds(options_parsed["period"].as<size_t>());
   }
-  plant_name = settings.value("plant_name", plant_name);
-  relative_tol = settings.value("relative_tol", relative_tol);
-  absolute_tol = settings.value("absolute_tol", absolute_tol);
-  hmin = settings.value("hmin", hmin);
+  auto &solver = plant._solver_params;
+  solver._rel_tol = settings.value("relative_tol", solver._rel_tol);
+  solver._abs_tol = settings.value("absolute_tol", solver._abs_tol);
+  solver._hmin = settings.value("hmin", solver._hmin);
 
   trigger_mode = settings.value("trigger_mode", trigger_mode);
   if (options_parsed.count("trigger") != 0) {
     trigger_mode = true;
+  }
+
+  // Parameters must be set before initialization, where some of them are
+  // read. Also used after a reset, which restores the FMU defaults.
+  auto init_plant = [&]() {
+    if (settings.contains("parameters")) {
+      for (auto const &[param, value] : settings["parameters"].items()) {
+        plant.set(param, value);
+      }
+    }
+    plant.initialize();
+  };
+  try {
+    init_plant();
+  } catch (const std::exception &e) {
+    cerr << fg::red << "Error initializing FMU: " << e.what() << fg::reset
+         << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // Fixed-step co-simulation FMUs: times are counted in whole microseconds
+  const long long period_us =
+      chrono::duration_cast<chrono::microseconds>(period).count();
+  const long long step_us =
+      plant.get_fixed_step() ? llround(plant.get_step_size() * 1e6) : 0;
+  if (plant.get_fixed_step()) {
+    if (step_us <= 0) {
+      cerr << fg::red << "The model's fixed step is below 1 us" << fg::reset
+           << endl;
+      exit(EXIT_FAILURE);
+    }
+    if (!trigger_mode && period_us % step_us != 0) {
+      cerr << fg::red << "The agent period (" << period.count()
+           << " ms) must be a multiple of the model's fixed step ("
+           << plant.get_step_size() << " s)" << fg::reset << endl;
+      exit(EXIT_FAILURE);
+    }
   }
 
   // Connection
@@ -180,117 +215,110 @@ int main(int argc, char *const *argv) {
   cout << "  FMU file path:    " << style::bold << fmu_path << style::reset
        << endl
        << "  FMU type:          " << style::bold << ((plant.get_type() == 1) ? "Model Exchange" : "Co-Simulation") << style::reset << endl
-       << "  relative tol:     " << style::bold << relative_tol << style::reset
-       << endl
-       << "  absolutre tol:    " << style::bold << absolute_tol << style::reset
-       << endl
-       << "  hmin:             " << style::bold << hmin << style::reset 
+       << "  relative tol:     " << style::bold << solver._rel_tol
+       << style::reset << endl
+       << "  absolute tol:     " << style::bold << solver._abs_tol
+       << style::reset << endl
+       << "  hmin:             " << style::bold << solver._hmin << style::reset
        << endl;
-  plant._solver_params._rel_tol = 1e-5;
-  plant._solver_params._abs_tol = 1e-7;
-  plant._solver_params._hmin = 1e-12;
 
   if (settings.contains("parameters")) {
-    cout << style::bold << "Overriding default FMU parameters (" 
-         << settings["parameters"].size() << ") from settings:" 
-         << style::reset << endl;
-    int i = 0;
+    cout << style::bold << "FMU parameters from settings ("
+         << settings["parameters"].size() << "):" << style::reset << endl;
     for (auto const &[param, value] : settings["parameters"].items()) {
-      cout << "  " << param << ": " << style::bold << value 
-           << style::reset;
-      if (!value.is_number()) {
-        cout << fg::red << "  NOT A NUMBER, SKIPPING" << fg::reset;
-      } else {
-        plant.set_real(param, value.get<double>());
-      }
-      cout << endl;
-      i++;
+      cout << "  " << param << ": " << style::bold << value << style::reset
+           << endl;
     }
-    cout << "  " << i << " parameters overridden" << endl;
   }
-  cout << endl << endl << endl; // to compensate for next goback(3)
-
-
+  // Room for the status lines redrawn with goback()
+  cout << string(trigger_mode ? 4 : 3, '\n');
 
   auto last_timestep = chrono::steady_clock::now();
   chrono::steady_clock::time_point now;
-  double dt = 0, t = 0, t_in = 0, t_msg = 0;
-  int dtus = 0, step_s = 0;
-  static double t_buffer = 0.0;
+  double dt = 0;
+  long long t_buffer_us = 0;
+  bool first_trigger = true;
   json status;
   array<string, 3> console_out;
+  // The wrapper owns the simulation clock
+  auto sim_time = [&]() { return to_string(plant.get_time()) + " s"; };
 
   // Process a received JSON message: update plant inputs and console_out.
-  // early_exit=true (free-running): returns on reset or missing fmu_input,
-  //   skipping set_real so integration proceeds with unchanged inputs.
-  // early_exit=false (trigger): continues past reset and applies fmu_input.
-  auto process_input = [&](json const &in, bool early_exit = false) {
-    if (in.value("fmu_reset", false)) {
+  // early_exit=true (free-running): a reset skips fmu_input for that message.
+  // early_exit=false (trigger): fmu_input is applied after the reset.
+  auto process_input = [&](json const &in, bool early_exit) {
+    if (!in.is_object()) {
+      console_out[0] = sim_time() + ", Message is not a JSON object";
+      return;
+    }
+    const bool reset = in.value("fmu_reset", false);
+    if (reset) {
       plant.reset();
-      t_msg = t;
-      t = 0;
-      console_out[0] = to_string(t_msg) + " s, Reset received";
+      init_plant();
+      console_out[0] = sim_time() + ", Reset received";
       if (early_exit) return;
     }
-    if (!in["fmu_input"].is_object()) {
-      t_msg = t;
-      console_out[0] = to_string(t_msg) + " s, Missing fmu_input";
-      if (early_exit) return;
+    if (!in.contains("fmu_input") || !in["fmu_input"].is_object()) {
+      if (!reset) console_out[0] = sim_time() + ", Missing fmu_input";
+      return;
     }
-    t_in = t;
-    console_out[1] = to_string(t_in) + " s, " + in["fmu_input"].dump();
+    console_out[1] = sim_time() + ", " + in["fmu_input"].dump();
     for (auto const &[k, v] : in["fmu_input"].items()) {
-      if (v.is_array()) {
-        plant.set_real(k, v.get<std::vector<double>>());
-      } else if (v.is_number()) {
-        plant.set_real(k, v.get<double>());
-      } else {
-        console_out[1] = " (skipped, not a number or array)";
+      try {
+        plant.set(k, v);
+      } catch (const std::exception &e) {
+        // One bad variable must not block the others, nor stop the agent
+        console_out[1] += string(" (") + e.what() + ")";
       }
+    }
+  };
+
+  // A malformed message is reported and dropped
+  auto handle_message = [&](string const &payload, bool early_exit) {
+    try {
+      process_input(json::parse(payload), early_exit);
+    } catch (const std::exception &e) {
+      console_out[0] = sim_time() + ", Message ignored: " + e.what();
     }
   };
 
   if (trigger_mode) {
     agent.loop([&]() -> chrono::milliseconds {
-      if (agent.receive(false) == message_type::json && agent.last_topic() != "control") {
+      if (agent.receive(false) == message_type::json &&
+          agent.last_topic() != "control") {
+        const string payload = get<1>(agent.last_message());
         now = chrono::steady_clock::now();
-
-        dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
+        if (first_trigger) { // the wait for the first message is not simulated
+          last_timestep = now;
+          first_trigger = false;
+        }
+        long long dt_us =
+            chrono::duration_cast<chrono::microseconds>(now - last_timestep)
                 .count();
         last_timestep = now;
 
-        if(plant.get_fixed_step()){
-
-          t_buffer += dt;
-          step_s = plant.get_step_size() * 1e6; // us
-          
-          int num_steps = t_buffer / step_s;
-          if(num_steps > 0){
-            dt = num_steps * step_s; // force dt
-            t_buffer -= dt; // t_buffer will contain the residual
-          } else{
-            console_out[2] = "Skipped step: " + to_string(t_buffer) + "s";
-            cout << goback(3) << fg::yellow << "Last message: " << console_out[0]
-                 << fg::reset << endl
-                 << "Received: " << console_out[1] << endl
-                 << "Status update after: " << console_out[2] << endl
-                 << "buffer: " << t_buffer << " dt: " << dt << endl;
-            return 0ms;
-          }
+        bool step = true;
+        if (plant.get_fixed_step()) {
+          t_buffer_us += dt_us;
+          dt_us = (t_buffer_us / step_us) * step_us; // whole model steps only
+          t_buffer_us -= dt_us;                      // keep the remainder
+          step = dt_us > 0;
         }
-
-        dt = dt / 1e6;
-        t += dt;
-        console_out[2] = to_string(t) + " s";
-        plant.do_step(dt);
-        plant.get_status(status);
-        auto tet = chrono::steady_clock::now() - now;
-        status["TET"] =
-          chrono::duration_cast<chrono::microseconds>(tet).count();
-        agent.publish(status);
-        auto msg = agent.last_message();
-        auto in = json::parse(get<1>(msg));
-        process_input(in);
+        if (step) {
+          dt = dt_us / 1e6;
+          plant.do_step(dt);
+          plant.get_status(status);
+          auto tet = chrono::steady_clock::now() - now;
+          status["TET"] =
+              chrono::duration_cast<chrono::microseconds>(tet).count();
+          agent.publish(status);
+          console_out[2] = sim_time();
+        } else {
+          console_out[2] =
+              "skipped, " + to_string(t_buffer_us / 1e6) + " s pending";
+        }
+        // Inputs are applied after the step, also when the step is skipped
+        handle_message(payload, false);
       }
 
       cout << goback(4) << fg::yellow << "Last message: " << console_out[0]
@@ -305,33 +333,25 @@ int main(int argc, char *const *argv) {
     agent.loop([&]() -> chrono::milliseconds {
       // timing
       now = chrono::steady_clock::now();
-      if(plant.get_fixed_step()){
-        dt = static_cast<double>(period.count()) / 1e3;
-        dtus = dt * 1e6;
-        step_s = plant.get_step_size() * 1e6; // us
-        if(dtus % step_s != 0){ // comparison in microseconds
-
-          throw std::runtime_error("The agent period must be a multiple of the model's fixed step");
-        }
-
-      } else{
+      if (plant.get_fixed_step()) {
+        dt = period_us / 1e6;
+      } else {
         dt = chrono::duration_cast<chrono::microseconds>(now - last_timestep)
-                      .count() / 1e6;
-
-          last_timestep = now;
+                 .count() / 1e6;
+        last_timestep = now;
       }
-      t += dt;
-      // input
-      if (agent.receive(true) == message_type::json &&
-          agent.last_topic() != "control") {
-        auto msg = agent.last_message();
-        auto in = json::parse(get<1>(msg));
-        process_input(in, true);
+      // input: drain the queue, or with more than one message per period the
+      // plant would run on stale inputs
+      for (auto type = agent.receive(true); type != message_type::none;
+           type = agent.receive(true)) {
+        if (type == message_type::json && agent.last_topic() != "control") {
+          handle_message(get<1>(agent.last_message()), true);
+        }
       }
       // Integrate
       plant.do_step(dt);
       plant.get_status(status);
-      console_out[2] = to_string(t) + " s";
+      console_out[2] = sim_time();
       auto tet = chrono::steady_clock::now() - now;
       status["TET"] =
           chrono::duration_cast<chrono::microseconds>(tet).count();
