@@ -62,6 +62,13 @@ mads fmu my_model.fmu --inspect
 
 This is giving you a table of model variables and a suitable stub section for the `mads.ini` file. Copy that into your settings file, update the fields as needed and launch the `mads broker` command, if it is not running already.
 
+The INI section accepts these solver settings. They apply to model exchange FMUs only, as co-simulation FMUs carry their own solver:
+
+- `relative_tol` (default `1e-5`) and `absolute_tol` (default `1e-7`): tolerances of the variable-step integrator
+- `hmin` (default `1e-12`): smallest integration step, in seconds. If the tolerances cannot be met with a step this small, the agent stops with an error
+
+The values in the `parameters` sub-section are applied **before** the model is initialized, so that parameters setting the initial conditions take effect. They can be numbers, booleans or arrays, according to the type of the FMU parameter. A parameter with an unknown name or the wrong type stops the agent at startup.
+
 > **Note:** the inspect command reports the file name and the **model name**. The latter can be different from the file name, and it is set by the software that generated the FMU. On the MADS network, the agent running the FMU will have the name `fmu_<model name>`, also reported by the inspect command. Inless overridden by the `--name` switch, this is the expected section name in the INI settings file `mads.ini`.
 
 Now you can run the agent:
@@ -83,11 +90,15 @@ The model is routinely evaluated and forward integrated at variable timestep, an
 }
 ```
 
+Each value must match the type of the FMU variable: a number for a `Float64` input, `true` or `false` for a `Boolean` input, and an array with all the elements for an array input, e.g. `"setpoint": [100, 50, 20]`. An entry with an unknown name, the wrong type or the wrong size is skipped and reported on the agent console; the other entries are still applied.
+
 To reset the model, send the following:
 
 ```json
 {"fmu_reset": true}
 ```
+
+A reset brings the model back to its initial state: the simulation time restarts from zero, the `parameters` of the INI section are applied again, and the inputs go back to the start values declared in the FMU. Send the inputs again after a reset.
 
 It is suggested to use the [rerunner plugin](https://github.com/mads-net/rerunner_plugin) to visualize the model state in real time.
 
@@ -102,6 +113,8 @@ In **trigger mode** the agent instead blocks waiting for an incoming message on 
 1. Advance the simulation clock and integrate forward by the elapsed wall-clock time since the last received message.
 2. Publish the resulting state **before** applying the new inputs contained in the message (so the published state reflects the model response to the *previous* input).
 3. Apply the new `fmu_input` values from the received message (ready for the next step).
+
+The first message only starts the clock: the time spent waiting for it is not simulated. With a fixed-step co-simulation FMU, a message that arrives less than one model step after the previous one does not advance nor publish the model, but its inputs are still applied.
 
 This makes the simulation step rate slave to the rate of the upstream publisher, which is useful when the FMU is part of a closed-loop pipeline where each controller tick drives one simulation step. The `period` setting is ignored in trigger mode.
 
