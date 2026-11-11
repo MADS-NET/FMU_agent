@@ -47,12 +47,17 @@ public:
     FmuWrapper(const FmuWrapper&) = delete;
     FmuWrapper& operator=(const FmuWrapper&) = delete;
 
-    // Allow moving
-    FmuWrapper(FmuWrapper&& other) noexcept;
-    FmuWrapper& operator=(FmuWrapper&& other) noexcept;
+    // Prevent moving: hold a wrapper in a std::unique_ptr if it must be moved
+    FmuWrapper(FmuWrapper&&) = delete;
+    FmuWrapper& operator=(FmuWrapper&&) = delete;
 
     std::string model_name();
 
+    /// Enter and exit initialization mode. Parameters must be set before this.
+    void initialize();
+
+    /// Bring the FMU back to the state it had right after construction:
+    /// set parameters again, then call initialize()
     void reset();
 
     /// Execute one simulation step
@@ -67,6 +72,11 @@ public:
     void set_real(const std::string& name, double value);
     void set_real(const std::string& name, const std::vector<double>& values);
     void set_bool(const std::string& name, bool value);
+
+    /// Set a variable from a JSON value, according to its FMI data type:
+    /// a number or an array of numbers for Float64, true/false for Boolean
+    /// @throws std::runtime_error on unknown name, wrong type or wrong size
+    void set(const std::string& name, const json& value);
 
     /// Get a real-valued variable by name
     /// @param name Variable name
@@ -101,8 +111,8 @@ public:
     double get_step_size() const { return _step_size; }
 
     struct SolverParams {
-        double _rel_tol = 1e-6;
-        double _abs_tol = 1e-8;
+        double _rel_tol = 1e-5;
+        double _abs_tol = 1e-7;
         double _hmin = 1e-12;
     };
 
@@ -119,8 +129,11 @@ private:
     std::vector<std::string> _indep_vars;
 
     double _start_time, _current_time;
+    double _h_last = 0.0; // last step chosen by the RK45 controller, 0 = none
+    fmi3Boolean _next_event_time_defined = fmi3False;
+    fmi3Float64 _next_event_time = 0.0;
     std::unordered_map<std::string, fmi3ValueReference> _var_cache;
-    mutable std::unordered_map<std::string, size_t> _real_array_len_cache;
+    mutable std::unordered_map<std::string, size_t> _var_size_cache;
     mutable std::unordered_map<std::string, std::string> _var_dimensions_cache;
     mutable std::string _model_description_xml;
 
@@ -136,7 +149,11 @@ private:
 
     /// Resolve variable name to value reference
     fmi3ValueReference resolve_var_ref(const std::string& name) const;
-    size_t resolve_real_array_length(const std::string& name) const;
+    /// Number of elements of a variable (1 for a scalar), any type and rank
+    size_t resolve_var_size(const std::string& name) const;
+    fmi3DataType var_type(const std::string& name) const;
+    void require_scalar(const std::string& name) const;
+    void require_float64(const std::string& name) const;
     std::string resolve_var_dimensions(const std::string& name) const;
     
     /// Check FMI status and throw if error
@@ -149,4 +166,7 @@ private:
     
     /// Handle discrete state updates and events
     void handle_events();
+
+    /// Free the FMU instance and the FMU
+    void release();
 };

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -76,14 +77,9 @@ bool extract_xml_attribute(const std::string &tag, const std::string &attr,
   return true;
 }
 
-struct RealArrayMetadata {
-  bool _is_float64 = false;
-  bool _is_array = false;
-  std::size_t _rank = 0;
-  std::size_t _length = 0;
-};
-
-RealArrayMetadata parse_real_array_metadata(const std::string &xml,
+// Total number of elements of a variable: 1 for a scalar, the product of the
+// dimensions for an array of any rank
+std::size_t parse_variable_size(const std::string &xml,
                                             const std::string &name) {
   constexpr const char *tags[] = {"Float64",      "Float32", "Int8",   "UInt8",
                                   "Int16",        "UInt16",  "Int32",  "UInt32",
@@ -105,10 +101,9 @@ RealArrayMetadata parse_real_array_metadata(const std::string &xml,
         continue;
       }
 
-      RealArrayMetadata meta;
-      meta._is_float64 = std::string(tag) == "Float64";
+      std::size_t size = 1;
       if (header.size() >= 2 && header[header.size() - 2] == '/') {
-        return meta;
+        return size;
       }
 
       const std::string end_tag = std::string("</") + tag + ">";
@@ -129,9 +124,6 @@ RealArrayMetadata parse_real_array_metadata(const std::string &xml,
         }
         const std::string dim_tag =
             body.substr(dim_pos, dim_end - dim_pos + 1);
-        meta._is_array = true;
-        meta._rank++;
-
         std::string start_value;
         if (!extract_xml_attribute(dim_tag, "start", start_value)) {
           throw std::runtime_error(
@@ -152,12 +144,10 @@ RealArrayMetadata parse_real_array_metadata(const std::string &xml,
               "Variable " + name +
               " array dimension does not fit in host size_t");
         }
-        if (meta._rank == 1) {
-          meta._length = static_cast<std::size_t>(len);
-        }
+        size *= static_cast<std::size_t>(len);
         dim_pos = dim_end + 1;
       }
-      return meta;
+      return size;
     }
   }
 
@@ -460,6 +450,40 @@ std::vector<std::string> parse_dependency_output(const std::string &output) {
   return deps;
 }
 
+// Read the n elements of a variable: a JSON scalar, or a flat JSON array
+template <typename T>
+json read_values(fmi3Status (*getter)(fmi3InstanceHandle *,
+                                      const fmi3ValueReference[], size_t, T[],
+                                      size_t),
+                 fmi3InstanceHandle *instance, fmi3ValueReference vr,
+                 std::size_t n, bool scalar, fmi3Status &status) {
+  auto buffer = std::make_unique<T[]>(n); // vector<bool> has no data()
+  status = getter(instance, &vr, 1, buffer.get(), n);
+  if (scalar) {
+    return json(buffer[0]);
+  }
+  json values = json::array();
+  for (std::size_t i = 0; i < n; ++i) {
+    values.push_back(buffer[i]);
+  }
+  return values;
+}
+
+// Dormand-Prince 5(4). Row 6 of DP_A is the 5th-order solution, so stage 7 is
+// evaluated at the new state and is reused as stage 1 of the next step (FSAL).
+constexpr double DP_C[7] = {0.0, 1.0 / 5, 3.0 / 10, 4.0 / 5, 8.0 / 9, 1.0, 1.0};
+constexpr double DP_A[7][6] = {
+    {},
+    {1.0 / 5},
+    {3.0 / 40, 9.0 / 40},
+    {44.0 / 45, -56.0 / 15, 32.0 / 9},
+    {19372.0 / 6561, -25360.0 / 2187, 64448.0 / 6561, -212.0 / 729},
+    {9017.0 / 3168, -355.0 / 33, 46732.0 / 5247, 49.0 / 176, -5103.0 / 18656},
+    {35.0 / 384, 0.0, 500.0 / 1113, 125.0 / 192, -2187.0 / 6784, 11.0 / 84}};
+// 5th-order minus 4th-order weights: the error estimate needs all 7 stages
+constexpr double DP_E[7] = {71.0 / 57600, 0.0, -71.0 / 16695, 71.0 / 1920,
+                            -17253.0 / 339200, 22.0 / 525, -1.0 / 40};
+
 } // namespace
 
 // Static map initializations for enum-to-string translation
@@ -545,6 +569,16 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
     throw std::runtime_error("Failed to load FMU: " + fmu_path);
   }
 
+  // A constructor that throws does not run the destructor
+  struct Guard {
+    FmuWrapper *_wrapper;
+    ~Guard() {
+      if (_wrapper) {
+        _wrapper->release();
+      }
+    }
+  } guard{this};
+
   auto v = fmi4c_getFmiVersion(_fmu);
   if (v != 3) {
     throw std::runtime_error(std::string("Unsupported FMU version: ") +
@@ -565,18 +599,17 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
       size_t cs_end = _model_description_xml.find(">", cs_pos);
       string cs_tag = _model_description_xml.substr(cs_pos, cs_end - cs_pos + 1);
 
-      string var_step;
-      if(extract_xml_attribute(cs_tag, "canHandleVariableCommunicationStepSize", var_step)){
-        _fixed_step = !(var_step == "true" || var_step == "1");
-
-        std::string step_string;
-        if (extract_xml_attribute(cs_tag, "fixedInternalStepSize", step_string)) {
-          _step_size = std::stod(step_string);
-        }
-        
-      } else{
-        _fixed_step = false;
+      // FMI 3.0: without this attribute the FMU needs a fixed step
+      string var_step, step_string;
+      const bool variable_step =
+          extract_xml_attribute(
+              cs_tag, "canHandleVariableCommunicationStepSize", var_step) &&
+          (var_step == "true" || var_step == "1");
+      if (extract_xml_attribute(cs_tag, "fixedInternalStepSize", step_string)) {
+        _step_size = std::stod(step_string);
       }
+      // Without a declared internal step there is nothing to enforce
+      _fixed_step = !variable_step && _step_size > 0.0;
     }
 
     _instance = fmi3_instantiateCoSimulation(
@@ -608,20 +641,6 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
     throw std::runtime_error("Failed to instantiate FMU: " + instance_name);
   }
 
-  // Enter initialization mode
-  fmi3Status status = fmi3_enterInitializationMode(_instance,
-                                                   false, // toleranceDefined
-                                                   0.0,   // tolerance
-                                                   start_time, // startTime
-                                                   false, // stopTimeDefined
-                                                   0.0    // stopTime
-  );
-  check_status(status, "enterInitializationMode");
-
-  // Exit initialization mode to prepare for stepping
-  status = fmi3_exitInitializationMode(_instance);
-  check_status(status, "exitInitializationMode");
-
   int vnum = fmi3_getNumberOfVariables(_fmu);
   for (int i = 0; i < vnum; ++i) {
     auto v = fmi3_getVariableByIndex(_fmu, i + 1);
@@ -638,13 +657,40 @@ FmuWrapper::FmuWrapper(const std::string &fmu_path,
       _indep_vars.push_back(fmi3_getVariableName(v));
     }
   }
-  _initialized = true;
+  guard._wrapper = nullptr;
 }
 
-FmuWrapper::~FmuWrapper() {
+void FmuWrapper::initialize() {
+  if (!_instance) {
+    throw std::runtime_error("FMU instance not created");
+  }
+  check_status(fmi3_enterInitializationMode(_instance,
+                                            false,       // toleranceDefined
+                                            0.0,         // tolerance
+                                            _start_time, // startTime
+                                            false,       // stopTimeDefined
+                                            0.0),        // stopTime
+               "enterInitializationMode");
+  check_status(fmi3_exitInitializationMode(_instance),
+               "exitInitializationMode");
+  _current_time = _start_time;
+  _h_last = 0.0;
+  _next_event_time_defined = fmi3False;
+  _initialized = true;
+  if (_type == FmuType::ModelExchange) {
+    // A Model Exchange FMU leaves initialization in Event Mode, and stays
+    // parked there between do_step() calls
+    handle_events();
+  }
+}
+
+FmuWrapper::~FmuWrapper() { release(); }
+
+void FmuWrapper::release() {
   if (_instance) {
-    // Terminate simulation
-    fmi3_terminate(_instance);
+    if (_initialized) {
+      fmi3_terminate(_instance);
+    }
     fmi3_freeInstance(_instance);
     _instance = nullptr;
   }
@@ -652,42 +698,6 @@ FmuWrapper::~FmuWrapper() {
     fmi4c_freeFmu(_fmu);
     _fmu = nullptr;
   }
-}
-
-FmuWrapper::FmuWrapper(FmuWrapper &&other) noexcept
-    : _fmu(other._fmu), _instance(other._instance),
-      _fmu_path(std::move(other._fmu_path)),
-      _instance_name(std::move(other._instance_name)),
-      _start_time(other._start_time), _current_time(other._current_time),
-      _var_cache(std::move(other._var_cache)) {
-  other._fmu = nullptr;
-  other._instance = nullptr;
-}
-
-FmuWrapper &FmuWrapper::operator=(FmuWrapper &&other) noexcept {
-  if (this != &other) {
-    // Clean up current resources
-    if (_instance) {
-      fmi3_terminate(_instance);
-      fmi3_freeInstance(_instance);
-    }
-    if (_fmu) {
-      fmi4c_freeFmu(_fmu);
-    }
-
-    // Move from other
-    _fmu = other._fmu;
-    _instance = other._instance;
-    _fmu_path = std::move(other._fmu_path);
-    _instance_name = std::move(other._instance_name);
-    _start_time = other._start_time;
-    _current_time = other._current_time;
-    _var_cache = std::move(other._var_cache);
-
-    other._fmu = nullptr;
-    other._instance = nullptr;
-  }
-  return *this;
 }
 
 std::string FmuWrapper::model_name() {
@@ -698,10 +708,14 @@ std::string FmuWrapper::model_name() {
 }
 
 void FmuWrapper::reset() {
-  if (!_instance || !_initialized) {
-    throw std::runtime_error("FMU instance not initialized");
+  if (!_instance) {
+    throw std::runtime_error("FMU instance not created");
   }
   check_status(fmi3_reset(_instance), "Resetting the model");
+  // Back to the Instantiated state: set parameters, then call initialize()
+  _initialized = false;
+  _current_time = _start_time;
+
 }
 
 void FmuWrapper::do_step(double dt) {
@@ -741,213 +755,214 @@ void FmuWrapper::do_step(double dt) {
         fmi3_enterStepMode(_instance);
     }
 
-  } else if(_type == FmuType::ModelExchange){ // MODEL EXCHANGE
+  } else if (_type == FmuType::ModelExchange) { // MODEL EXCHANGE
 
-    // Get the number of continuous states
-    size_t numStates = 0;
-    fmi3Status status = fmi3_getNumberOfContinuousStates(_instance, &numStates);
-    check_status(status, "getNumberOfContinuousStates");
+    const double rel_tol = _solver_params._rel_tol;
+    const double abs_tol = _solver_params._abs_tol;
+    const double hmin = _solver_params._hmin;
+    const double tend = _current_time + dt;
 
-    if (numStates == 0) {
-      // No states to integrate, just advance time and handle events
-      _current_time += dt;
-      handle_events();
-      return;
+    size_t n = 0, nz = 0;
+    check_status(fmi3_getNumberOfContinuousStates(_instance, &n),
+                 "getNumberOfContinuousStates");
+    check_status(fmi3_getNumberOfEventIndicators(_instance, &nz),
+                 "getNumberOfEventIndicators");
+
+    // The FMU is parked in Event Mode between calls: inputs set since the last
+    // call are processed here, then integration runs in Continuous-Time Mode
+    handle_events();
+    check_status(fmi3_enterContinuousTimeMode(_instance),
+                 "enterContinuousTimeMode");
+
+    std::vector<fmi3Float64> y(n), ynew(n), ytemp(n), scratch(n);
+    std::vector<fmi3Float64> z(nz), znew(nz);
+    std::array<std::vector<fmi3Float64>, 7> k;
+    for (auto &ki : k) {
+      ki.resize(n);
+    }
+    if (n) {
+      check_status(fmi3_getContinuousStates(_instance, y.data(), n),
+                   "getContinuousStates");
+    }
+    if (nz) {
+      check_status(fmi3_getEventIndicators(_instance, z.data(), nz),
+                   "getEventIndicators");
     }
 
-    // Adaptive RK45 integration parameters
-    const double &relTol = _solver_params._rel_tol;
-    const double &absTol = _solver_params._abs_tol;
-    const double &hmin = _solver_params._hmin;
+    // dx = f(ts, x)
+    auto f = [&](double ts, const std::vector<fmi3Float64> &x,
+                 std::vector<fmi3Float64> &dx) {
+      check_status(fmi3_setTime(_instance, ts), "setTime");
+      if (!n) {
+        return;
+      }
+      check_status(fmi3_setContinuousStates(_instance, x.data(), n),
+                   "setContinuousStates");
+      // Simulink FMUs refresh their block outputs lazily, and only after
+      // computing the derivatives: reading the states first forces the refresh
+      check_status(fmi3_getContinuousStates(_instance, scratch.data(), n),
+                   "getContinuousStates");
+      check_status(fmi3_getContinuousStateDerivatives(_instance, dx.data(), n),
+                   "getContinuousStateDerivatives");
+    };
 
     double t = _current_time;
-    double tend = _current_time + dt;
-    double h = dt; // Initial step size
+    double h = _h_last > 0.0 ? _h_last : dt;
+    bool k1_valid = false; // inputs may have changed since the last call
 
-    std::vector<fmi3Float64> y(numStates);
-    std::vector<fmi3Float64> ytemp(numStates);
-    std::vector<fmi3Float64> k1(numStates), k2(numStates), k3(numStates);
-    std::vector<fmi3Float64> k4(numStates), k5(numStates), k6(numStates);
-    std::vector<fmi3Float64> yerr(numStates);
-
-    // Get initial state
-    status = fmi3_getContinuousStates(_instance, y.data(), numStates);
-    check_status(status, "getContinuousStates");
-
-    // Adaptive stepping loop
-    while (t < tend && h > hmin) {
-      // Limit step to not overshoot tend
-      if (t + h > tend) {
-        h = tend - t;
-      }
-
-      // RK45 with Dormand-Prince coefficients
-      // Stage 1: k1 = f(t, y)
-      status =
-          fmi3_getContinuousStateDerivatives(_instance, k1.data(), numStates);
-      check_status(status, "getContinuousStateDerivatives at stage 1");
-
-      // Stage 2: k2 = f(t + (1/5)*h, y + (1/5)*h*k1)
-      for (size_t i = 0; i < numStates; ++i) {
-        ytemp[i] = y[i] + (h / 5.0) * k1[i];
-      }
-      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-      check_status(status, "setContinuousStates at stage 2");
-      status =
-          fmi3_getContinuousStateDerivatives(_instance, k2.data(), numStates);
-      check_status(status, "getContinuousStateDerivatives at stage 2");
-
-      // Stage 3: k3 = f(t + (3/10)*h, y + (3/40)*h*k1 + (9/40)*h*k2)
-      for (size_t i = 0; i < numStates; ++i) {
-        ytemp[i] = y[i] + (3.0 / 40.0) * h * k1[i] + (9.0 / 40.0) * h * k2[i];
-      }
-      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-      check_status(status, "setContinuousStates at stage 3");
-      status =
-          fmi3_getContinuousStateDerivatives(_instance, k3.data(), numStates);
-      check_status(status, "getContinuousStateDerivatives at stage 3");
-
-      // Stage 4: k4 = f(t + (4/5)*h, y + (44/45)*h*k1 - (56/15)*h*k2 +
-      // (32/9)*h*k3)
-      for (size_t i = 0; i < numStates; ++i) {
-        ytemp[i] = y[i] + (44.0 / 45.0) * h * k1[i] - (56.0 / 15.0) * h * k2[i] +
-                  (32.0 / 9.0) * h * k3[i];
-      }
-      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-      check_status(status, "setContinuousStates at stage 4");
-      status =
-          fmi3_getContinuousStateDerivatives(_instance, k4.data(), numStates);
-      check_status(status, "getContinuousStateDerivatives at stage 4");
-
-      // Stage 5: k5 = f(t + (8/9)*h, y + ...)
-      for (size_t i = 0; i < numStates; ++i) {
-        ytemp[i] = y[i] + (19372.0 / 6561.0) * h * k1[i] -
-                  (25360.0 / 2187.0) * h * k2[i] +
-                  (64448.0 / 6561.0) * h * k3[i] - (212.0 / 729.0) * h * k4[i];
-      }
-      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-      check_status(status, "setContinuousStates at stage 5");
-      status =
-          fmi3_getContinuousStateDerivatives(_instance, k5.data(), numStates);
-      check_status(status, "getContinuousStateDerivatives at stage 5");
-
-      // Stage 6: k6 = f(t + h, y + ...)
-      for (size_t i = 0; i < numStates; ++i) {
-        ytemp[i] = y[i] + (9017.0 / 3168.0) * h * k1[i] -
-                  (355.0 / 33.0) * h * k2[i] + (46732.0 / 5247.0) * h * k3[i] +
-                  (49.0 / 176.0) * h * k4[i] - (5103.0 / 18656.0) * h * k5[i];
-      }
-      status = fmi3_setContinuousStates(_instance, ytemp.data(), numStates);
-      check_status(status, "setContinuousStates at stage 6");
-      status =
-          fmi3_getContinuousStateDerivatives(_instance, k6.data(), numStates);
-      check_status(status, "getContinuousStateDerivatives at stage 6");
-
-      // 5th order solution: y_new = y + h * (35/384*k1 + 500/1113*k3 + 125/192*k4
-      // - 2187/6784*k5 + 11/84*k6) 4th order solution for error: y_hat = y + h *
-      // (5179/57600*k1 + 7571/16695*k3 + 393/640*k4 - 92097/339200*k5 +
-      // 187/2100*k6)
-      std::vector<fmi3Float64> ynew(numStates);
-      for (size_t i = 0; i < numStates; ++i) {
-        ynew[i] = y[i] + h * (35.0 / 384.0 * k1[i] + 500.0 / 1113.0 * k3[i] +
-                              125.0 / 192.0 * k4[i] - 2187.0 / 6784.0 * k5[i] +
-                              11.0 / 84.0 * k6[i]);
-
-        // Error estimate (difference between 5th and 4th order)
-        double y4th =
-            y[i] + h * (5179.0 / 57600.0 * k1[i] + 7571.0 / 16695.0 * k3[i] +
-                        393.0 / 640.0 * k4[i] - 92097.0 / 339200.0 * k5[i] +
-                        187.0 / 2100.0 * k6[i]);
-        yerr[i] = std::abs(ynew[i] - y4th);
-      }
-
-      // Compute maximum relative error
-      double maxError = 0.0;
-      for (size_t i = 0; i < numStates; ++i) {
-        double scale = absTol + relTol * std::abs(y[i]);
-        double error = yerr[i] / scale;
-        maxError = std::max(maxError, error);
-      }
-
-      // Adaptive step size control
-      if (maxError <= 1.0) {
-        // Step accepted: update y and t
-        y = ynew;
-        t += h;
-        _current_time = t;
-
-        // Set accepted state into FMU
-        status = fmi3_setContinuousStates(_instance, y.data(), numStates);
-        check_status(status, "setContinuousStates (accepted step)");
-
-        // Increase step size for next iteration (but not too aggressively)
-        h *= 0.9 * std::pow(1.0 / maxError, 0.2);
-        h = std::min(h, 10.0 * (tend - t)); // Don't let h grow too much
-      } else {
-        // Step rejected: reduce step size
-        h *= 0.9 * std::pow(1.0 / maxError, 0.25);
-      }
-
-      // Enforce minimum step size to prevent infinite loops
+    while (t < tend) {
       if (h < hmin) {
-        h = hmin;
+        throw std::runtime_error("RK45: step size below hmin at t=" +
+                                 std::to_string(t));
+      }
+      // Never step across a scheduled time event or past tend
+      const double tstop = (_next_event_time_defined && _next_event_time > t &&
+                            _next_event_time < tend)
+                               ? _next_event_time
+                               : tend;
+      const double h_ctrl = h; // step wanted by the controller
+      const bool truncated = t + 1.01 * h >= tstop;
+      if (truncated) {
+        h = tstop - t;
+      }
+
+      if (!k1_valid) {
+        f(t, y, k[0]);
+        k1_valid = true;
+      }
+      for (int s = 1; s < 7; ++s) {
+        auto &x = (s == 6) ? ynew : ytemp;
+        for (size_t i = 0; i < n; ++i) {
+          double sum = 0.0;
+          for (int j = 0; j < s; ++j) {
+            sum += DP_A[s][j] * k[j][i];
+          }
+          x[i] = y[i] + h * sum;
+        }
+        f(t + DP_C[s] * h, x, k[s]);
+      }
+
+      double err = 0.0;
+      for (size_t i = 0; i < n; ++i) {
+        double e = 0.0;
+        for (int j = 0; j < 7; ++j) {
+          e += DP_E[j] * k[j][i];
+        }
+        const double r =
+            std::abs(h * e) /
+            (abs_tol + rel_tol * std::max(std::abs(y[i]), std::abs(ynew[i])));
+        if (!std::isfinite(r)) { // std::max would silently drop a NaN
+          err = std::numeric_limits<double>::infinity();
+          break;
+        }
+        err = std::max(err, r);
+      }
+
+      if (err <= 1.0) {
+        // Step accepted; the FMU already holds ynew from stage 7
+        t = truncated ? tstop : t + h;
+        y.swap(ynew);
+        k[0].swap(k[6]);
+        _current_time = t;
+        check_status(fmi3_setTime(_instance, t), "setTime");
+
+        fmi3Boolean enter_event = fmi3False, terminate = fmi3False;
+        check_status(fmi3_completedIntegratorStep(_instance, fmi3True,
+                                                  &enter_event, &terminate),
+                     "completedIntegratorStep");
+        if (terminate) {
+          throw std::runtime_error("FMU requested termination during step");
+        }
+        bool event =
+            enter_event || (_next_event_time_defined && t >= _next_event_time);
+        if (nz) {
+          check_status(fmi3_getEventIndicators(_instance, znew.data(), nz),
+                       "getEventIndicators");
+          for (size_t j = 0; j < nz; ++j) {
+            event = event || ((z[j] > 0.0) != (znew[j] > 0.0));
+          }
+          z.swap(znew);
+        }
+        if (event) {
+          // shortcut: a state event is handled at the end of the step where
+          // it is detected, not located; add root finding if an FMU needs it
+          check_status(fmi3_enterEventMode(_instance), "enterEventMode");
+          handle_events();
+          check_status(fmi3_enterContinuousTimeMode(_instance),
+                       "enterContinuousTimeMode");
+          if (n) {
+            check_status(fmi3_getContinuousStates(_instance, y.data(), n),
+                         "getContinuousStates");
+          }
+          if (nz) {
+            check_status(fmi3_getEventIndicators(_instance, z.data(), nz),
+                         "getEventIndicators");
+          }
+          k1_valid = false;
+        }
+        // A step shortened to hit tstop must not shrink the controller's step
+        h = std::max(h * std::clamp(0.9 * std::pow(err, -0.2), 0.2, 5.0),
+                     truncated ? h_ctrl : 0.0);
+      } else {
+        // Step rejected: k[0] is still f(t, y), the retry sets the stage states
+        h *= std::clamp(0.9 * std::pow(err, -0.2), 0.2, 1.0);
       }
     }
 
-    // Ensure we're exactly at tend
+    _h_last = std::min(h, dt);
     _current_time = tend;
-
-    // Handle events at the end of the step
+    check_status(fmi3_enterEventMode(_instance), "enterEventMode");
     handle_events();
   }
-
-  
 }
 
 void FmuWrapper::handle_events() {
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");
   }
-  // Check for events after stepping
-  fmi3Boolean newDiscreteStatesNeeded = true;
-  fmi3Boolean terminateSimulation = false;
-  fmi3Boolean nominalsOfContinuousStatesChanged = false;
-  fmi3Boolean valuesOfContinuousStatesChanged = false;
-  fmi3Boolean nextEventTimeDefined = false;
-  fmi3Float64 nextEventTime = 0.0;
+  fmi3Boolean discrete_states_need_update = fmi3True;
+  fmi3Boolean terminate = fmi3False;
+  fmi3Boolean nominals_changed = fmi3False;
+  fmi3Boolean values_changed = fmi3False;
 
-  // Process events if necessary
-  while (newDiscreteStatesNeeded) {
-    fmi3Status status = fmi3_updateDiscreteStates(
-        _instance, &newDiscreteStatesNeeded, &terminateSimulation,
-        &nominalsOfContinuousStatesChanged, &valuesOfContinuousStatesChanged,
-        &nextEventTimeDefined, &nextEventTime);
-    check_status(status, "updateDiscreteStates");
-
-    if (terminateSimulation) {
+  while (discrete_states_need_update) {
+    check_status(fmi3_updateDiscreteStates(_instance,
+                                           &discrete_states_need_update,
+                                           &terminate, &nominals_changed,
+                                           &values_changed,
+                                           &_next_event_time_defined,
+                                           &_next_event_time),
+                 "updateDiscreteStates");
+    if (terminate) {
       throw std::runtime_error(
           "FMU requested termination during event handling");
     }
   }
+  if (_type == FmuType::ModelExchange) {
+    // Simulink's model_update() overwrites the model time with zero
+    check_status(fmi3_setTime(_instance, _current_time), "setTime");
+  }
 }
 
 void FmuWrapper::set_real(const std::string &name, double value) {
-  if (!_instance || !_initialized) {
+  if (!_instance) {
     throw std::runtime_error("FMU instance not initialized");
   }
 
   fmi3ValueReference vr = resolve_var_ref(name);
+  require_scalar(name);
 
   fmi3Status status = fmi3_setFloat64(_instance, &vr, 1, &value, 1);
   check_status(status, std::string("setFloat64 for variable ") + name);
 }
 
 void FmuWrapper::set_bool(const std::string &name, bool value) {
-  if (!_instance || !_initialized) {
+  if (!_instance) {
     throw std::runtime_error("FMU instance not initialized");
   }
 
   fmi3ValueReference vr = resolve_var_ref(name);
+  require_scalar(name);
   const fmi3Boolean fmi_value = value;
 
   fmi3Status status = fmi3_setBoolean(_instance, &vr, 1, &fmi_value, 1);
@@ -956,10 +971,11 @@ void FmuWrapper::set_bool(const std::string &name, bool value) {
 
 void FmuWrapper::set_real(const std::string &name,
                           const std::vector<double> &values) {
-  if (!_instance || !_initialized) {
-    throw std::runtime_error("FMU instance not initialized");
+  if (!_instance) {
+    throw std::runtime_error("FMU instance not created");
   }
-  const std::size_t expected = resolve_real_array_length(name);
+  require_float64(name);
+  const std::size_t expected = resolve_var_size(name);
   if (values.size() != expected) {
     throw std::runtime_error("Size mismatch for variable " + name +
                              ": expected " + std::to_string(expected) +
@@ -981,6 +997,7 @@ double FmuWrapper::get_real(const std::string &name) const {
   }
 
   fmi3ValueReference vr = resolve_var_ref(name);
+  require_scalar(name);
   fmi3Float64 value = 0.0;
 
   fmi3Status status = fmi3_getFloat64(_instance, &vr, 1, &value, 1);
@@ -995,6 +1012,7 @@ bool FmuWrapper::get_bool(const std::string &name) const {
   }
 
   fmi3ValueReference vr = resolve_var_ref(name);
+  require_scalar(name);
   fmi3Boolean value = fmi3False;
 
   fmi3Status status = fmi3_getBoolean(_instance, &vr, 1, &value, 1);
@@ -1008,7 +1026,8 @@ void FmuWrapper::get_real(const std::string &name,
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");
   }
-  const std::size_t expected = resolve_real_array_length(name);
+  require_float64(name);
+  const std::size_t expected = resolve_var_size(name);
   values.resize(expected);
   if (values.empty()) {
     throw std::runtime_error("Cannot get empty array for variable " + name);
@@ -1043,6 +1062,7 @@ void FmuWrapper::list_variables(ostream &s) {
     if (c > fmi3Causality::fmi3CausalityCalculatedParameter)
       continue;
     std::string dtype = get_data_type_string(fmi3_getVariableDataType(v));
+    const char *description = fmi3_getVariableDescription(v);
     const std::string dims = resolve_var_dimensions(var_name);
     if (!dims.empty()) {
       // Convert "[3x2]" to "(3x2)" for compact table output.
@@ -1050,7 +1070,7 @@ void FmuWrapper::list_variables(ostream &s) {
     }
 
     s << setw(fw) << var_name
-      << setw(fw) << fmi3_getVariableDescription(v)
+      << setw(fw) << (description ? description : "")
       << setw(tw) << dtype
       << setw(fw) << get_causality_string(c)
       << setw(fw) << get_initial_kind_string(fmi3_getVariableInitial(v))
@@ -1110,72 +1130,72 @@ json FmuWrapper::value(string const &name) {
   if (!_instance || !_initialized) {
     throw std::runtime_error("FMU instance not initialized");
   }
-  fmi3ValueReference vref = resolve_var_ref(name);
-  auto var = fmi3_getVariableByName(_instance->fmu, name.c_str());
-  fmi3Status status;
-  static json jval;
-  data_type_t value;
-  switch (fmi3_getVariableDataType(var)) {
+  const fmi3ValueReference vref = resolve_var_ref(name);
+  const std::size_t n = resolve_var_size(name);
+  const bool scalar = resolve_var_dimensions(name).empty();
+  const fmi3DataType type = var_type(name);
+  fmi3Status status = fmi3OK;
+  json jval;
+  switch (type) {
   case fmi3DataType::fmi3DataTypeFloat64:
-    status = fmi3_getFloat64(_instance, &vref, 1, &value.dbl, 1);
-    check_status(status, std::string("getFloat64 for variable ") + name);
-    jval = value.dbl;
+    jval = read_values(fmi3_getFloat64, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeFloat32:
-    status = fmi3_getFloat32(_instance, &vref, 1, &value.flt, 1);
-    check_status(status, std::string("getFloat32 for variable ") + name);
-    jval = value.flt;
+    jval = read_values(fmi3_getFloat32, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeInt8:
-    status = fmi3_getInt8(_instance, &vref, 1, &value.i8, 1);
-    check_status(status, std::string("getInt8 for variable ") + name);
-    jval = value.i8;
+    jval = read_values(fmi3_getInt8, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeUInt8:
-    status = fmi3_getUInt8(_instance, &vref, 1, &value.u8, 1);
-    check_status(status, std::string("getUInt8 for variable ") + name);
-    jval = value.u8;
+    jval = read_values(fmi3_getUInt8, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeInt16:
-    status = fmi3_getInt16(_instance, &vref, 1, &value.i16, 1);
-    check_status(status, std::string("getInt16 for variable ") + name);
-    jval = value.i16;
+    jval = read_values(fmi3_getInt16, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeUInt16:
-    status = fmi3_getUInt16(_instance, &vref, 1, &value.u16, 1);
-    check_status(status, std::string("getUInt16 for variable ") + name);
-    jval = value.u16;
+    jval = read_values(fmi3_getUInt16, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeInt32:
-    status = fmi3_getInt32(_instance, &vref, 1, &value.i32, 1);
-    check_status(status, std::string("getInt32 for variable ") + name);
-    jval = value.i32;
+    jval = read_values(fmi3_getInt32, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeUInt32:
-    status = fmi3_getUInt32(_instance, &vref, 1, &value.u32, 1);
-    check_status(status, std::string("getUInt3264 for variable ") + name);
-    jval = value.u32;
+    jval = read_values(fmi3_getUInt32, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeInt64:
-    status = fmi3_getInt64(_instance, &vref, 1, &value.i64, 1);
-    check_status(status, std::string("getInt64 for variable ") + name);
-    jval = value.i64;
+  case fmi3DataType::fmi3DataTypeEnumeration: // enumerations are read as Int64
+    jval = read_values(fmi3_getInt64, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeUInt64:
-    status = fmi3_getUInt64(_instance, &vref, 1, &value.u64, 1);
-    check_status(status, std::string("getUInt64 for variable ") + name);
-    jval = value.u64;
+    jval = read_values(fmi3_getUInt64, _instance, vref, n, scalar, status);
     break;
   case fmi3DataType::fmi3DataTypeBoolean:
-    status = fmi3_getBoolean(_instance, &vref, 1, &value.b, 1);
-    check_status(status, std::string("getBoolean for variable ") + name);
-    jval = value.b;
+    jval = read_values(fmi3_getBoolean, _instance, vref, n, scalar, status);
     break;
   default:
-    throw std::runtime_error("Unsupported value data type " + get_data_type_string(fmi3_getVariableDataType(var)));
-    break;
+    throw std::runtime_error("Unsupported value data type " +
+                             get_data_type_string(type));
   }
+  check_status(status,
+               "get" + get_data_type_string(type) + " for variable " + name);
   return jval;
+}
+
+void FmuWrapper::set(const std::string &name, const json &value) {
+  resolve_var_ref(name); // throws if the variable does not exist
+  const fmi3DataType type = var_type(name);
+  if (type == fmi3DataType::fmi3DataTypeFloat64 && value.is_array()) {
+    set_real(name, value.get<std::vector<double>>());
+  } else if (type == fmi3DataType::fmi3DataTypeFloat64 && value.is_number()) {
+    set_real(name, value.get<double>());
+  } else if (type == fmi3DataType::fmi3DataTypeBoolean && value.is_boolean()) {
+    set_bool(name, value.get<bool>());
+  } else {
+    // shortcut: only Float64 and Boolean variables can be written; add the
+    // integer types when an FMU needs them
+    throw std::runtime_error("Cannot set " + name + " (" +
+                             get_data_type_string(type) + ") from a JSON " +
+                             value.type_name());
+  }
 }
 
 void FmuWrapper::get_status(json &status) {
@@ -1194,15 +1214,13 @@ void FmuWrapper::get_status(json &status) {
         causality == fmi3Causality::fmi3CausalityCalculatedParameter) {
       continue;
     }
-    const std::string dims = resolve_var_dimensions(name);
-    const bool is_vector = !dims.empty() && dims.find('x') == std::string::npos;
-    if (is_vector) {
-      std::vector<double> values;
-      get_real(name, values);
-      status[get_causality_string(causality)][name] = values;
-    } else {
-      status[get_causality_string(causality)][name] = value(name);
+    const auto type = fmi3_getVariableDataType(v);
+    if (type == fmi3DataType::fmi3DataTypeString ||
+        type == fmi3DataType::fmi3DataTypeBinary ||
+        type == fmi3DataType::fmi3DataTypeClock) {
+      continue; // shortcut: not published, add when an FMU needs them
     }
+    status[get_causality_string(causality)][name] = value(name);
   }
 }
 
@@ -1355,7 +1373,7 @@ std::vector<std::string> FmuWrapper::get_binary_dependencies() const {
 }
 
 fmi3ValueReference FmuWrapper::resolve_var_ref(const std::string &name) const {
-  if (!_instance || !_initialized) {
+  if (!_instance) {
     throw std::runtime_error("FMU instance not initialized");
   }
   // Check cache first
@@ -1379,40 +1397,43 @@ fmi3ValueReference FmuWrapper::resolve_var_ref(const std::string &name) const {
   return vr;
 }
 
-size_t FmuWrapper::resolve_real_array_length(const std::string &name) const {
-  if (!_instance || !_initialized) {
-    throw std::runtime_error("FMU instance not initialized");
+size_t FmuWrapper::resolve_var_size(const std::string &name) const {
+  if (!_instance) {
+    throw std::runtime_error("FMU instance not created");
   }
 
-  const auto cached = _real_array_len_cache.find(name);
-  if (cached != _real_array_len_cache.end()) {
+  const auto cached = _var_size_cache.find(name);
+  if (cached != _var_size_cache.end()) {
     return cached->second;
   }
 
-  if (_model_description_xml.empty()) {
-    _model_description_xml = read_model_description_xml(_fmu_path);
-  }
+  const std::size_t size = parse_variable_size(_model_description_xml, name);
+  _var_size_cache[name] = size;
+  return size;
+}
 
-  const RealArrayMetadata meta =
-      parse_real_array_metadata(_model_description_xml, name);
-  if (!meta._is_float64) {
+fmi3DataType FmuWrapper::var_type(const std::string &name) const {
+  resolve_var_ref(name); // throws if the variable does not exist
+  return fmi3_getVariableDataType(fmi3_getVariableByName(_fmu, name.c_str()));
+}
+
+void FmuWrapper::require_scalar(const std::string &name) const {
+  const std::size_t n = resolve_var_size(name);
+  if (n != 1) {
+    throw std::runtime_error("Variable " + name + " is an array of " +
+                             std::to_string(n) + " elements");
+  }
+}
+
+void FmuWrapper::require_float64(const std::string &name) const {
+  if (var_type(name) != fmi3DataType::fmi3DataTypeFloat64) {
     throw std::runtime_error("Variable " + name + " is not Float64");
   }
-  if (!meta._is_array) {
-    throw std::runtime_error("Variable " + name + " is not an array");
-  }
-  if (meta._rank != 1) {
-    throw std::runtime_error("Variable " + name +
-                             " is not a 1-D array");
-  }
-
-  _real_array_len_cache[name] = meta._length;
-  return meta._length;
 }
 
 std::string FmuWrapper::resolve_var_dimensions(const std::string &name) const {
-  if (!_instance || !_initialized) {
-    throw std::runtime_error("FMU instance not initialized");
+  if (!_instance) {
+    throw std::runtime_error("FMU instance not created");
   }
 
   const auto cached = _var_dimensions_cache.find(name);
