@@ -94,8 +94,8 @@ set(FMI4C_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(FMI4C_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     fmi4c
-    GIT_REPOSITORY https://github.com/pbosetti/fmi4c.git
-    GIT_TAG        e15679853cdc81f5ed3c48fe566a8aede123b4f4
+    GIT_REPOSITORY https://github.com/robbr48/fmi4c.git
+    GIT_TAG        v1.2
     EXCLUDE_FROM_ALL
 )
 
