@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
   { // linear_axis: step response, model time, reset
     FmuWrapper plant(dir + "/linear_axis.fmu", "plant");
     CHECK(throws([&] { plant.do_step(0.1); })); // not initialized yet
+    CHECK(plant.model_name() == "linear_axis"); // the agent needs it before
     plant.initialize();
     CHECK(plant.get_real("X") == 0.0);
     plant.set("setpoint", 100.0);

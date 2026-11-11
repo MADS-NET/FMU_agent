@@ -701,8 +701,8 @@ void FmuWrapper::release() {
 }
 
 std::string FmuWrapper::model_name() {
-  if (!_instance || !_initialized) {
-    throw std::runtime_error("FMU instance not initialized");
+  if (!_instance) {
+    throw std::runtime_error("FMU instance not created");
   }
   return fmi3_modelName(_instance->fmu);
 }
