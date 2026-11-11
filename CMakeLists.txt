@@ -95,8 +95,7 @@ set(FMI4C_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     fmi4c
     GIT_REPOSITORY https://github.com/pbosetti/fmi4c.git
-    GIT_TAG        HEAD   # or a commit hash for reproducibility
-    GIT_SHALLOW    TRUE
+    GIT_TAG        e15679853cdc81f5ed3c48fe566a8aede123b4f4
     EXCLUDE_FROM_ALL
 )
 

@@ -11,6 +11,7 @@ using namespace std;
 
 int main(int argc, const char **argv) {
   FmuWrapper plant(argv[1], "plant");
+  plant.initialize();
   // std::cerr << "variables:" << std::endl;
   // plant.list_variables(std::cerr);
 

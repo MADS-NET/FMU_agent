@@ -21,6 +21,10 @@ endif()
 add_executable(fmu-test test.cpp)
 target_link_libraries(fmu-test PRIVATE fmiinterface)
 
+# Self-check on the example FMUs: fmu-selfcheck <directory with the .fmu files>
+add_executable(fmu-selfcheck selfcheck.cpp)
+target_link_libraries(fmu-selfcheck PRIVATE fmiinterface)
+
 # Agent
 add_executable(mads-fmu fmu_agent.cpp)
 if(WIN32)
