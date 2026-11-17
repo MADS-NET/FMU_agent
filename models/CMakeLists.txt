@@ -119,6 +119,8 @@ macro(add_fmu_library LIB_NAME)
     COMPONENT ${FMU_INSTALL_COMPONENT}
     EXCLUDE_FROM_ALL
   )
+  # Ship the archive in the package; OPTIONAL because it exists only after install_fmu
+  install(FILES "${FMU_DESTINATION}.fmu" DESTINATION models/fmu OPTIONAL)
 endmacro()
 
 
